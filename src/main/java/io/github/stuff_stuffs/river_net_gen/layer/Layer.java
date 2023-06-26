@@ -1,48 +1,93 @@
 package io.github.stuff_stuffs.river_net_gen.layer;
 
-import io.github.stuff_stuffs.river_net_gen.util.Hex;
+import io.github.stuff_stuffs.river_net_gen.util.SHM;
 
 import java.util.function.Function;
 
 public sealed interface Layer<T> {
-    T get(Hex.Coordinate coordinate);
+    T get(SHM.Coordinate coordinate);
 
     final class Basic<T> implements Layer<T> {
-        private final Function<Hex.Coordinate, T> func;
+        private final Function<SHM.Coordinate, T> func;
 
-        public Basic(final Function<Hex.Coordinate, T> func) {
+        public Basic(final Function<SHM.Coordinate, T> func) {
             this.func = func;
         }
 
         @Override
-        public T get(final Hex.Coordinate coordinate) {
+        public T get(final SHM.Coordinate coordinate) {
             return func.apply(coordinate);
         }
     }
 
-    final class Caching<T> implements Layer<T> {
-        private final Layer<T> delegate;
+    final class CachingOuter<T> implements Layer<T> {
+        private final Basic<T> delegate;
+        private final int level;
         private final int mask;
-        private final Hex.Coordinate[] keys;
+        private final int[] hashes;
+        private final SHM.Coordinate[] keys;
         private final Object[] values;
 
-        public Caching(final Layer<T> delegate, final int sizeLog2) {
+        public CachingOuter(final Basic<T> delegate, final int sizeLog2, final int level) {
             this.delegate = delegate;
-            mask = (1 << sizeLog2) - 1;
-            keys = new Hex.Coordinate[1 << sizeLog2];
-            values = new Object[1 << sizeLog2];
+            this.level = level;
+            final int size = 1 << sizeLog2;
+            mask = size - 1;
+            hashes = new int[size];
+            keys = new SHM.Coordinate[size];
+            values = new Object[size];
         }
 
         @Override
-        public T get(final Hex.Coordinate coordinate) {
-            final int hash = coordinate.hashCode();
-            final int index = hash & mask;
-            if (coordinate.equals(keys[index])) {
-                return (T) values[index];
+        public T get(final SHM.Coordinate coordinate) {
+            final int hash = SHM.outerHash(coordinate, level);
+            final int pos = hash & mask;
+            if (hashes[pos] == hash) {
+                final SHM.Coordinate key = keys[pos];
+                if (key != null && SHM.outerEquals(coordinate, key, level)) {
+                    return (T) values[pos];
+                }
             }
             final T val = delegate.get(coordinate);
-            keys[index] = coordinate;
-            values[index] = val;
+            keys[pos] = coordinate;
+            values[pos] = val;
+            hashes[pos] = hash;
+            return val;
+        }
+    }
+
+    final class CachingInner<T> implements Layer<T> {
+        private final Basic<T> delegate;
+        private final int level;
+        private final int mask;
+        private final int[] hashes;
+        private final SHM.Coordinate[] keys;
+        private final Object[] values;
+
+        public CachingInner(final Basic<T> delegate, final int sizeLog2, final int level) {
+            this.delegate = delegate;
+            this.level = level;
+            final int size = 1 << sizeLog2;
+            mask = size - 1;
+            hashes = new int[size];
+            keys = new SHM.Coordinate[size];
+            values = new Object[size];
+        }
+
+        @Override
+        public T get(final SHM.Coordinate coordinate) {
+            final int hash = SHM.innerHash(coordinate, level);
+            final int pos = hash & mask;
+            if (hashes[pos] == hash) {
+                final SHM.Coordinate key = keys[pos];
+                if (key != null && SHM.innerEquals(coordinate, key, level)) {
+                    return (T) values[pos];
+                }
+            }
+            final T val = delegate.get(coordinate);
+            keys[pos] = coordinate;
+            values[pos] = val;
+            hashes[pos] = hash;
             return val;
         }
     }

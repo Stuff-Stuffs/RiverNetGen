@@ -10,10 +10,11 @@ public final class Hex {
     public static Coordinate fromCartesian(final double x, final double y) {
         final double qd = (2 / 3.0) * x;
         final double rd = (-1 / 3.0) * x + SQRT3_3 * y;
-        return round(qd, rd, -qd - rd);
+        return round(qd, rd);
     }
 
-    private static Coordinate round(final double qd, final double rd, final double sd) {
+    public static Coordinate round(final double qd, final double rd) {
+        final double sd = -(qd + rd);
         int q = (int) Math.round(qd);
         int r = (int) Math.round(rd);
         final int s = (int) Math.round(sd);
@@ -76,6 +77,52 @@ public final class Hex {
         Direction(final int qOff, final int rOff) {
             this.qOff = qOff;
             this.rOff = rOff;
+        }
+
+        public Direction opposite() {
+            return switch (this) {
+                case UP -> DOWN;
+                case UP_RIGHT -> DOWN_LEFT;
+                case DOWN_RIGHT -> UP_LEFT;
+                case DOWN -> UP;
+                case DOWN_LEFT -> UP_RIGHT;
+                case UP_LEFT -> DOWN_RIGHT;
+            };
+        }
+
+        public Direction rotateCC() {
+            return switch (this) {
+                case UP -> UP_LEFT;
+                case UP_RIGHT -> UP;
+                case DOWN_RIGHT -> UP_RIGHT;
+                case DOWN -> DOWN_RIGHT;
+                case DOWN_LEFT -> DOWN;
+                case UP_LEFT -> DOWN_LEFT;
+            };
+        }
+
+        public Direction rotateC() {
+            return switch (this) {
+                case UP -> UP_RIGHT;
+                case UP_RIGHT -> DOWN_RIGHT;
+                case DOWN_RIGHT -> DOWN;
+                case DOWN -> DOWN_LEFT;
+                case DOWN_LEFT -> UP_LEFT;
+                case UP_LEFT -> UP;
+            };
+        }
+
+        public static Direction fromOffset(final int q, final int r) {
+            if (q == 0 && r != 0) {
+                return r > 0 ? DOWN : UP;
+            }
+            if (q != 0 && r == 0) {
+                return q > 0 ? DOWN_RIGHT : UP_LEFT;
+            }
+            if (q == -r) {
+                return q > 0 ? UP_RIGHT : DOWN_LEFT;
+            }
+            throw new IllegalArgumentException();
         }
     }
 
