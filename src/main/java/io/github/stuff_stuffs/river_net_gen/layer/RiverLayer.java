@@ -278,7 +278,7 @@ public final class RiverLayer {
             visited.add(coordinate);
             final Node node = nodes.get(coordinate);
             if (node.incoming.isEmpty()) {
-                node.height = height + level;
+                node.height = height + 1;
                 node.minHeightAlongPath = node.height;
                 node.minDepthAlongPath = node.depth;
             } else {
