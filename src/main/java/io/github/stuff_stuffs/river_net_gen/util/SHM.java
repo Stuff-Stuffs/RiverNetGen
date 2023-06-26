@@ -250,6 +250,7 @@ public final class SHM {
     public static final class LevelCache {
         private final Hash.Strategy<SHM.Coordinate> inner;
         private final Hash.Strategy<SHM.Coordinate> outer;
+        private final Hash.Strategy<SHM.Coordinate> full;
         private final SHM.Coordinate up;
         private final SHM.Coordinate upRight;
         private final SHM.Coordinate downRight;
@@ -260,6 +261,7 @@ public final class SHM {
         public LevelCache(final int level) {
             inner = SHM.innerStrategy(level);
             outer = SHM.outerStrategy(level);
+            full = SHM.innerStrategy(MAX_LEVEL);
             up = SHM.offset(Hex.Direction.UP, level);
             upRight = SHM.offset(Hex.Direction.UP_RIGHT, level);
             downRight = SHM.offset(Hex.Direction.DOWN_RIGHT, level);
@@ -285,6 +287,10 @@ public final class SHM {
 
         public Hash.Strategy<SHM.Coordinate> outer() {
             return outer;
+        }
+
+        public Hash.Strategy<SHM.Coordinate> full() {
+            return full;
         }
     }
 

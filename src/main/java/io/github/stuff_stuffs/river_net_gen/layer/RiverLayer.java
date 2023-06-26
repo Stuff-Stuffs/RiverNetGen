@@ -69,7 +69,7 @@ public final class RiverLayer {
         return oceanAdjacent[(HashCommon.murmurHash3(seed + hash) >>> 1) % idx];
     }
 
-    public static Layer.Basic<RiverData> expand(final int level, final int seed, final Layer<RiverData> prev) {
+    public static Layer.Basic<RiverData> zoom(final int level, final int seed, final Layer<RiverData> prev) {
         final SHM shm = new SHM(SHM.MAX_LEVEL);
         final SHM.LevelCache cache = new SHM.LevelCache(level);
         final SHM.LevelCache outerCache = new SHM.LevelCache(level + 1);
@@ -80,10 +80,109 @@ public final class RiverLayer {
         return new Layer.Basic<>(coordinate -> dataLayer.get(coordinate).data[coordinate.get(level)]);
     }
 
+    public static Layer.Basic<RiverData> expand(final int level, final int seed, final Layer<RiverData> prev) {
+        final SHM shm = new SHM(SHM.MAX_LEVEL);
+        final SHM.LevelCache cache = new SHM.LevelCache(level);
+        return new Layer.Basic<>(coordinate -> tryFill(coordinate, seed, prev, shm, cache, level));
+    }
+
+    private static RiverData tryFill(final SHM.Coordinate coordinate, final int seed, final Layer<RiverData> prev, final SHM shm, final SHM.LevelCache cache, int level) {
+        final SHM.Coordinate truncate = SHM.outerTruncate(coordinate, level);
+        final RiverData data = prev.get(truncate);
+        if (data.type() == PlateType.CONTINENT) {
+            final Set<Hex.Direction> additionalIncoming = EnumSet.noneOf(Hex.Direction.class);
+            for (final Hex.Direction direction : DIRECTIONS) {
+                final SHM.Coordinate offset = shm.add(truncate, cache.offset(direction));
+                if (fillCheck(offset, seed, prev, shm, cache)) {
+                    final @Nullable ObjectDoublePair<Hex.Direction> outgoing = outgoing(offset, seed, prev, shm, cache);
+                    if (outgoing != null && outgoing.left().opposite() == direction) {
+                        additionalIncoming.add(direction);
+                    }
+                }
+            }
+            if (additionalIncoming.isEmpty()) {
+                return data;
+            }
+            final Object2DoubleMap<Hex.Direction> incoming = new Object2DoubleOpenHashMap<>(data.incoming().size() + additionalIncoming.size());
+            for (final Object2DoubleMap.Entry<Hex.Direction> entry : data.incoming().object2DoubleEntrySet()) {
+                incoming.put(entry.getKey(), entry.getDoubleValue());
+            }
+            for (final Hex.Direction direction : additionalIncoming) {
+                incoming.put(direction, data.height() + 1);
+            }
+            return new RiverData(PlateType.CONTINENT, incoming, data.outgoing(), data.height());
+        } else {
+            if (!fillCheck(truncate, seed, prev, shm, cache)) {
+                return data;
+            }
+            final @Nullable ObjectDoublePair<Hex.Direction> outgoing = outgoing(truncate, seed, prev, shm, cache);
+            if (outgoing == null) {
+                return data;
+            }
+            return new RiverData(PlateType.CONTINENT, Object2DoubleMaps.emptyMap(), outgoing.left(), outgoing.rightDouble());
+        }
+    }
+
+    private static boolean fillCheck(final SHM.Coordinate coordinate, final int seed, final Layer<RiverData> prev, final SHM shm, final SHM.LevelCache cache) {
+        final RiverData centerData = prev.get(coordinate);
+        if (centerData.type() == PlateType.CONTINENT || !centerData.incoming().isEmpty()) {
+            return false;
+        }
+        int landAdjacent = 0;
+        for (final Hex.Direction direction : DIRECTIONS) {
+            final SHM.Coordinate add = shm.add(coordinate, cache.offset(direction));
+            final RiverData data = prev.get(add);
+            if (data.type() == PlateType.CONTINENT) {
+                landAdjacent++;
+            }
+        }
+        if (landAdjacent < 2) {
+            return false;
+        }
+        return ((HashCommon.mix((seed ^ cache.full().hashCode(coordinate) * 7 + 43)) >>> 1) & 1) == 1;
+    }
+
+    private static @Nullable ObjectDoublePair<Hex.Direction> outgoing(final SHM.Coordinate coordinate, final int seed, final Layer<RiverData> prev, final SHM shm, final SHM.LevelCache cache) {
+        final ObjectDoublePair<Hex.Direction>[] available = new ObjectDoublePair[DIRECTIONS.length];
+        int idx = 0;
+        for (final Hex.Direction direction : DIRECTIONS) {
+            final SHM.Coordinate add = shm.add(coordinate, cache.offset(direction));
+            final RiverData data = prev.get(add);
+            if (data.type() == PlateType.CONTINENT) {
+                available[idx++] = new ObjectDoubleImmutablePair<>(direction, data.height());
+            }
+        }
+        if (idx == 0) {
+            return null;
+        }
+        if (idx == 1) {
+            return available[0];
+        }
+        return available[(HashCommon.mix(seed + cache.full().hashCode(coordinate)) >>> 1) % idx];
+    }
+
     private static SubRiverData expandInternal(final SHM.Coordinate coordinate, final RiverData data, final int level, final SHM shm, final SHM.LevelCache cache, final SHM.LevelCache outerCache, final int seed) {
         final PlateType type = data.type();
+        if(data.type()==PlateType.OCEAN) {
+            if(data.incoming().isEmpty()) {
+                return SubRiverData.EMPTY_OCEAN;
+            }
+            final SHM.Coordinate truncated = SHM.outerTruncate(coordinate, level + 1);
+            RiverData[] dataArr = new RiverData[7];
+            dataArr[truncated.get(level)] = SubRiverData.EMPTY_OCEAN.data[0];
+            for (Hex.Direction direction : DIRECTIONS) {
+                final SHM.Coordinate offset = shm.add(truncated, cache.offset(direction.rotateC()));
+                if(data.incoming().containsKey(direction)) {
+                    RiverData riverData = new RiverData(PlateType.OCEAN, Object2DoubleMaps.singleton(direction, data.incoming().getDouble(direction)), null, 0);
+                    dataArr[offset.get(level)] = riverData;
+                } else {
+                    dataArr[offset.get(level)] = SubRiverData.EMPTY_OCEAN.data[0];
+                }
+            }
+            return new SubRiverData(dataArr);
+        }
         if (data.outgoing() == null) {
-            return type == PlateType.CONTINENT ? SubRiverData.EMPTY_CONTINENT : SubRiverData.EMPTY_OCEAN;
+            return SubRiverData.EMPTY_CONTINENT;
         }
         final SHM.Coordinate truncated = SHM.outerTruncate(coordinate, level + 1);
         final RandomCollection<SHM.Coordinate> randomCollection = new RandomCollection<>((long) seed << 32L | (SHM.outerHash(truncated, level) & 0xFFFF_FFFFL));
@@ -154,7 +253,7 @@ public final class RiverLayer {
         return new SubRiverData(dataArr);
     }
 
-    private static void fillHeights(final Map<SHM.Coordinate, Node> nodes, final Map<SHM.Coordinate, ObjectDoublePair<Hex.Direction>> incoming, final SHM shm, final SHM.LevelCache cache, final SHM.LevelCache outerCache, final double height, int level) {
+    private static void fillHeights(final Map<SHM.Coordinate, Node> nodes, final Map<SHM.Coordinate, ObjectDoublePair<Hex.Direction>> incoming, final SHM shm, final SHM.LevelCache cache, final SHM.LevelCache outerCache, final double height, final int level) {
         final PriorityQueue<SHM.Coordinate> available = new ObjectArrayFIFOQueue<>();
         for (final Map.Entry<SHM.Coordinate, Node> entry : nodes.entrySet()) {
             final Node node = entry.getValue();
@@ -209,7 +308,7 @@ public final class RiverLayer {
                 }
                 final Node nextNode = nodes.get(next);
                 nextNode.incomingHeights.put(node.outgoing.opposite(), node.height);
-                if(visited.contains(next)) {
+                if (visited.contains(next)) {
                     continue;
                 }
                 final Set<Hex.Direction> nextIncoming = nextNode.incoming;
