@@ -1,9 +1,9 @@
-package io.github.stuff_stuffs.river_net_gen.layer;
+package io.github.stuff_stuffs.river_net_gen.api.layer;
 
-import io.github.stuff_stuffs.river_net_gen.util.GenUtil;
-import io.github.stuff_stuffs.river_net_gen.util.Hex;
-import io.github.stuff_stuffs.river_net_gen.util.RandomCollection;
-import io.github.stuff_stuffs.river_net_gen.util.SHM;
+import io.github.stuff_stuffs.river_net_gen.api.util.GenUtil;
+import io.github.stuff_stuffs.river_net_gen.api.util.Hex;
+import io.github.stuff_stuffs.river_net_gen.api.util.RandomCollection;
+import io.github.stuff_stuffs.river_net_gen.api.util.SHM;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.PriorityQueue;
@@ -18,16 +18,31 @@ public final class RiverLayer {
     private static final Hex.Direction[] DIRECTIONS = Hex.Direction.values();
 
     public static Layer.Basic<PlateType> base(final int seed, final int level) {
-        final Hash.Strategy<SHM.Coordinate> strategy = SHM.outerStrategy(level);
+        final SHM.LevelCache cache = SHM.createCache(level);
+        final Hash.Strategy<SHM.Coordinate> strategy = cache.outer();
+        final SHM shm = SHM.create();
         return new Layer.Basic<>(coordinate -> {
-            final int s = HashCommon.murmurHash3(strategy.hashCode(coordinate) ^ seed);
-            return (s & 3) == 0 ? PlateType.CONTINENT : PlateType.OCEAN;
+            final PlateType type = plateOfCoordinate(coordinate, seed, strategy);
+            if (type == PlateType.CONTINENT) {
+                for (final Hex.Direction direction : DIRECTIONS) {
+                    final SHM.Coordinate offset = shm.add(coordinate, cache.offset(direction));
+                    if (plateOfCoordinate(offset, seed, strategy) == PlateType.OCEAN) {
+                        return PlateType.CONTINENT;
+                    }
+                }
+                return PlateType.OCEAN;
+            }
+            return type;
         });
     }
 
+    private static PlateType plateOfCoordinate(final SHM.Coordinate coordinate, final int seed, final Hash.Strategy<SHM.Coordinate> strategy) {
+        return (HashCommon.mix(strategy.hashCode(coordinate) ^ seed) & 31) < 14 ? PlateType.CONTINENT : PlateType.OCEAN;
+    }
+
     public static Layer.Basic<RiverData> riverBase(final int seed, final int level, final Layer<PlateType> prev) {
-        final SHM shm = new SHM(level);
-        final SHM.LevelCache cache = new SHM.LevelCache(level);
+        final SHM shm = SHM.create(level);
+        final SHM.LevelCache cache = SHM.createCache(level);
         return new Layer.Basic<>(coordinate -> {
             final PlateType type = prev.get(coordinate);
             if (type == PlateType.OCEAN) {
@@ -70,9 +85,9 @@ public final class RiverLayer {
     }
 
     public static Layer.Basic<RiverData> zoom(final int level, final int seed, final Layer<RiverData> prev) {
-        final SHM shm = new SHM(SHM.MAX_LEVEL);
-        final SHM.LevelCache cache = new SHM.LevelCache(level);
-        final SHM.LevelCache outerCache = new SHM.LevelCache(level + 1);
+        final SHM shm = SHM.create();
+        final SHM.LevelCache cache = SHM.createCache(level);
+        final SHM.LevelCache outerCache = SHM.createCache(level + 1);
         final Layer<SubRiverData> dataLayer = new Layer.CachingOuter<>(new Layer.Basic<>(coordinate -> {
             final RiverData data = prev.get(coordinate);
             return expandInternal(coordinate, data, level, shm, cache, outerCache, seed);
@@ -81,12 +96,12 @@ public final class RiverLayer {
     }
 
     public static Layer.Basic<RiverData> expand(final int level, final int seed, final Layer<RiverData> prev) {
-        final SHM shm = new SHM(SHM.MAX_LEVEL);
-        final SHM.LevelCache cache = new SHM.LevelCache(level);
+        final SHM shm = SHM.create();
+        final SHM.LevelCache cache = SHM.createCache(level);
         return new Layer.Basic<>(coordinate -> tryFill(coordinate, seed, prev, shm, cache, level));
     }
 
-    private static RiverData tryFill(final SHM.Coordinate coordinate, final int seed, final Layer<RiverData> prev, final SHM shm, final SHM.LevelCache cache, int level) {
+    private static RiverData tryFill(final SHM.Coordinate coordinate, final int seed, final Layer<RiverData> prev, final SHM shm, final SHM.LevelCache cache, final int level) {
         final SHM.Coordinate truncate = SHM.outerTruncate(coordinate, level);
         final RiverData data = prev.get(truncate);
         if (data.type() == PlateType.CONTINENT) {
@@ -163,17 +178,17 @@ public final class RiverLayer {
 
     private static SubRiverData expandInternal(final SHM.Coordinate coordinate, final RiverData data, final int level, final SHM shm, final SHM.LevelCache cache, final SHM.LevelCache outerCache, final int seed) {
         final PlateType type = data.type();
-        if(data.type()==PlateType.OCEAN) {
-            if(data.incoming().isEmpty()) {
+        if (data.type() == PlateType.OCEAN) {
+            if (data.incoming().isEmpty()) {
                 return SubRiverData.EMPTY_OCEAN;
             }
             final SHM.Coordinate truncated = SHM.outerTruncate(coordinate, level + 1);
-            RiverData[] dataArr = new RiverData[7];
+            final RiverData[] dataArr = new RiverData[7];
             dataArr[truncated.get(level)] = SubRiverData.EMPTY_OCEAN.data[0];
-            for (Hex.Direction direction : DIRECTIONS) {
+            for (final Hex.Direction direction : DIRECTIONS) {
                 final SHM.Coordinate offset = shm.add(truncated, cache.offset(direction.rotateC()));
-                if(data.incoming().containsKey(direction)) {
-                    RiverData riverData = new RiverData(PlateType.OCEAN, Object2DoubleMaps.singleton(direction, data.incoming().getDouble(direction)), null, 0);
+                if (data.incoming().containsKey(direction)) {
+                    final RiverData riverData = new RiverData(PlateType.OCEAN, Object2DoubleMaps.singleton(direction, data.incoming().getDouble(direction)), null, 0);
                     dataArr[offset.get(level)] = riverData;
                 } else {
                     dataArr[offset.get(level)] = SubRiverData.EMPTY_OCEAN.data[0];

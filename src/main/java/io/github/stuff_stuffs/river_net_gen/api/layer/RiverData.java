@@ -1,6 +1,6 @@
-package io.github.stuff_stuffs.river_net_gen.layer;
+package io.github.stuff_stuffs.river_net_gen.api.layer;
 
-import io.github.stuff_stuffs.river_net_gen.util.Hex;
+import io.github.stuff_stuffs.river_net_gen.api.util.Hex;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import org.jetbrains.annotations.Nullable;
 

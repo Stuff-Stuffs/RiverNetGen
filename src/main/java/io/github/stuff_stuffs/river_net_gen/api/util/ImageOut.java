@@ -1,4 +1,4 @@
-package io.github.stuff_stuffs.river_net_gen.util;
+package io.github.stuff_stuffs.river_net_gen.api.util;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
