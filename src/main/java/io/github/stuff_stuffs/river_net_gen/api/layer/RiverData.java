@@ -1,11 +1,12 @@
 package io.github.stuff_stuffs.river_net_gen.api.layer;
 
 import io.github.stuff_stuffs.river_net_gen.api.util.Hex;
-import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import org.jetbrains.annotations.Nullable;
 
-public record RiverData(PlateType type, Object2DoubleMap<Hex.Direction> incoming, @Nullable Hex.Direction outgoing,
-                        double height) {
+import java.util.Map;
+
+public record RiverData(PlateType type, Map<Hex.Direction, Incoming> incoming, @Nullable Hex.Direction outgoing,
+                        double height, double flowRate, long tiles) {
     public RiverData {
         if (outgoing != null && incoming.containsKey(outgoing)) {
             throw new IllegalArgumentException();
@@ -25,5 +26,8 @@ public record RiverData(PlateType type, Object2DoubleMap<Hex.Direction> incoming
                 throw new IllegalArgumentException();
             }
         }
+    }
+
+    public record Incoming(double height, long tiles, double flowRate) {
     }
 }

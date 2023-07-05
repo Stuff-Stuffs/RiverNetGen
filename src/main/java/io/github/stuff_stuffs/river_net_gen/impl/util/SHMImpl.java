@@ -11,7 +11,7 @@ public final class SHMImpl implements SHM {
     public static final int MAX_LEVEL = 16;
     private static final byte[] ENCODE = new byte[]{0, 5, 1, 6, 3, 4, 2};
     private static final Hex.Coordinate[] DECODE;
-    private static final byte[] ADDITION_TABLE;
+    static final byte[] ADDITION_TABLE;
 
     static {
         DECODE = new Hex.Coordinate[7];
@@ -51,9 +51,8 @@ public final class SHMImpl implements SHM {
     private final byte[] buffer0 = new byte[MAX_LEVEL];
     private final byte[] buffer1 = new byte[MAX_LEVEL];
 
-    public static Coordinate offset(final Hex.Direction direction, final int level) {
-        final byte[] data = new byte[level + 1];
-        data[data.length - 1] = switch (direction) {
+    public static byte idFromDirection(final Hex.Direction direction) {
+        return switch (direction) {
             case UP -> 5;
             case UP_RIGHT -> 6;
             case DOWN_RIGHT -> 1;
@@ -61,7 +60,22 @@ public final class SHMImpl implements SHM {
             case DOWN_LEFT -> 3;
             case UP_LEFT -> 4;
         };
+    }
+
+    public static Coordinate offset(final Hex.Direction direction, final int level) {
+        final byte[] data = new byte[level + 1];
+        data[data.length - 1] = idFromDirection(direction);
         return new SHMImpl.CoordinateImpl(data);
+    }
+
+    public static Coordinate shift(final Coordinate coordinate, final int shift) {
+        if (shift == 0 || coordinate.level() == 0) {
+            return coordinate;
+        }
+        final CoordinateImpl impl = (CoordinateImpl) coordinate;
+        final byte[] data = new byte[impl.level() + shift];
+        System.arraycopy(impl.data, 0, data, shift, impl.level());
+        return new CoordinateImpl(data);
     }
 
     @Override
@@ -115,7 +129,7 @@ public final class SHMImpl implements SHM {
         final int firstLevel = first.level();
         int len = Math.max(firstLevel, second.level());
         Arrays.fill(buffer1, (byte) 0);
-        copyData(buffer0, first);
+        copyData(buffer1, first);
         int lastNonZero = -1;
         for (int i = 0; i < len; i++) {
             final byte sum = ADDITION_TABLE[buffer1[i] * 7 + second.get(i)];
@@ -158,31 +172,6 @@ public final class SHMImpl implements SHM {
                 return 0;
             }
             return data[level];
-        }
-    }
-
-    public static final class OverlayCoordinateImpl implements Coordinate {
-        private final CoordinateImpl coordinate;
-        private final byte[] overlayData;
-        private final int offset;
-
-        public OverlayCoordinateImpl(final CoordinateImpl coordinate, final byte[] data, final int offset) {
-            this.coordinate = coordinate;
-            overlayData = data;
-            this.offset = offset;
-        }
-
-        @Override
-        public int level() {
-            return Math.max(coordinate.level(), offset + overlayData.length);
-        }
-
-        @Override
-        public byte get(final int level) {
-            if (0 <= level - offset && level - offset < overlayData.length) {
-                return overlayData[level - offset];
-            }
-            return coordinate.get(level);
         }
     }
 
@@ -270,15 +259,15 @@ public final class SHMImpl implements SHM {
         }
         final byte[] copy = new byte[coordinate.level()];
         copyData(copy, coordinate);
-        Arrays.fill(copy, 0, level, (byte)0);
+        Arrays.fill(copy, 0, level, (byte) 0);
         return new CoordinateImpl(copy);
     }
 
-    private static void copyData(byte[] data, Coordinate coordinate) {
-        if(coordinate instanceof CoordinateImpl impl) {
+    private static void copyData(final byte[] data, final Coordinate coordinate) {
+        if (coordinate instanceof CoordinateImpl impl) {
             System.arraycopy(impl.data, 0, data, 0, Math.min(data.length, impl.data.length));
         } else {
-            int len = Math.min(data.length, coordinate.level());
+            final int len = Math.min(data.length, coordinate.level());
             for (int i = 0; i < len; i++) {
                 data[i] = coordinate.get(i);
             }
@@ -310,6 +299,7 @@ public final class SHMImpl implements SHM {
             upLeft = SHM.offset(Hex.Direction.UP_LEFT, level);
         }
 
+        @Override
         public Coordinate offset(final Hex.Direction direction) {
             return switch (direction) {
                 case UP -> up;
@@ -326,14 +316,17 @@ public final class SHMImpl implements SHM {
             return level;
         }
 
+        @Override
         public Hash.Strategy<Coordinate> inner() {
             return inner;
         }
 
+        @Override
         public Hash.Strategy<Coordinate> outer() {
             return outer;
         }
 
+        @Override
         public Hash.Strategy<Coordinate> full() {
             return full;
         }

@@ -32,6 +32,10 @@ public interface SHM {
         return SHMImpl.outerTruncate(coordinate, level);
     }
 
+    static Coordinate shift(final SHM.Coordinate coordinate, final int shift) {
+        return SHMImpl.shift(coordinate, shift);
+    }
+
     static int outerHash(final Coordinate truncated, final int level) {
         return SHMImpl.outerHash(truncated, level);
     }

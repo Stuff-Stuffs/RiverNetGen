@@ -5,7 +5,12 @@ import io.github.stuff_stuffs.river_net_gen.impl.util.SHMImpl;
 
 import java.util.function.Function;
 
-public sealed interface Layer<T> {
+public sealed interface Layer<T> extends Function<SHM.Coordinate, T> {
+    @Override
+    default T apply(final SHM.Coordinate coordinate) {
+        return get(coordinate);
+    }
+
     T get(SHM.Coordinate coordinate);
 
     final class Basic<T> implements Layer<T> {
