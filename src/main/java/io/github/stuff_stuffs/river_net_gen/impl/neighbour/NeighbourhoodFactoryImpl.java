@@ -7,7 +7,7 @@ import io.github.stuff_stuffs.river_net_gen.impl.util.SHMImpl;
 
 import java.util.function.Function;
 
-public class NeighbourhoodFactoryImpl<T> implements NeighbourhoodFactory<T> {
+public class NeighbourhoodFactoryImpl implements NeighbourhoodFactory {
     private final SHM.Coordinate[] offsets;
     private final int level;
 
@@ -27,7 +27,7 @@ public class NeighbourhoodFactoryImpl<T> implements NeighbourhoodFactory<T> {
     }
 
     @Override
-    public Neighbourhood<T> build(final SHM.Coordinate coordinate, final Function<SHM.Coordinate, T> layer) {
+    public <T> Neighbourhood<T> build(final SHM.Coordinate coordinate, final Function<SHM.Coordinate, T> layer) {
         return new NeighbourhoodImpl<>(layer, offsets, SHM.outerTruncate(coordinate, level));
     }
 }

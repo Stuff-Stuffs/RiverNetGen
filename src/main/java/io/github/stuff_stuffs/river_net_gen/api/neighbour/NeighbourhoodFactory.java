@@ -5,10 +5,10 @@ import io.github.stuff_stuffs.river_net_gen.impl.neighbour.NeighbourhoodFactoryI
 
 import java.util.function.Function;
 
-public interface NeighbourhoodFactory<T> {
-    Neighbourhood<T> build(SHM.Coordinate coordinate, final Function<SHM.Coordinate, T> layer);
+public interface NeighbourhoodFactory {
+    <T> Neighbourhood<T> build(SHM.Coordinate coordinate, final Function<SHM.Coordinate, T> layer);
 
-    static <T> NeighbourhoodFactory<T> create(final int level) {
-        return new NeighbourhoodFactoryImpl<>(level);
+    static NeighbourhoodFactory create(final int level) {
+        return new NeighbourhoodFactoryImpl(level);
     }
 }

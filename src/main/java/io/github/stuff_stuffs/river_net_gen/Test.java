@@ -12,15 +12,18 @@ import io.github.stuff_stuffs.river_net_gen.impl.util.SHMImpl;
 public class Test {
     public static void main(final String[] args) {
         final int seed = 41231;
-        final int layerCount = 4;
+        final int layerCount = 2;
         final Layer.Basic<PlateType> base = RiverLayers.enclaveDestructor(layerCount + 1, RiverLayers.base(seed, layerCount + 1));
-        final Layer.Basic<RiverData> riverBase = RiverLayers.riverBase(seed, layerCount, new Layer.CachingOuter<>(base, 8, layerCount));
+        Layer.Basic<RiverData> riverBase = RiverLayers.riverBase(seed, layerCount, base);
+        for (int i = 0; i < 4; i++) {
+            riverBase = RiverLayers.grow(seed, layerCount, riverBase);
+        }
         Layer<RiverData> layer = riverBase;
         for (int i = layerCount - 1; i >= 0; i--) {
             final Layer.Basic<RiverData> zoom = RiverLayers.zoom(i, seed, layer);
-            layer = new Layer.CachingOuter<>(zoom, 8, i);
+            layer = zoom;
         }
-        final double scale = 1 / 3.0;
+        final double scale = 1 / 8.0;
         draw(scale, 0, "triver0.png", layer, false);
     }
 
@@ -31,7 +34,7 @@ public class Test {
             final Hex.Coordinate coordinate = Hex.fromCartesian(x * scale, y * scale);
             final SHM.Coordinate shmCoord = shm.fromHex(coordinate);
             final RiverData data = layer.get(shmCoord);
-            if (!heightMap && data.outgoing() != null && data.flowRate() > 0.01) {
+            if (!heightMap && data.outgoing() != null && data.flowRate() > 0.001) {
                 final Hex.Coordinate outgoing = shm.toHex(SHMImpl.outerTruncate(shm.add(shmCoord, cache.offset(data.outgoing())), level));
                 final Hex.Coordinate center = shm.toHex(SHMImpl.outerTruncate(shmCoord, level));
                 final double x0 = center.x();
@@ -41,7 +44,10 @@ public class Test {
                 final double y1 = outgoing.y();
 
                 if (lineSegDist(x0, y0, x1, y1, x * scale, y * scale) < 0.25) {
-                    final int val = (int) (data.flowRate() * 10000);
+                    if(!Double.isFinite(data.flowRate())) {
+                        return 0xFF0000;
+                    }
+                    final int val = (int) (flowRemap(data.flowRate()));
                     final int clamped = Math.max(Math.min(val, 255), 0);
                     return (clamped) | (clamped << 8) | (clamped << 16);
                 }
@@ -55,13 +61,16 @@ public class Test {
                     final SHM.Coordinate offset = shm.add(shmCoord, cache.offset(direction));
                     final Hex.Coordinate incoming = shm.toHex(SHMImpl.outerTruncate(offset, level));
                     final RiverData riverData = layer.get(offset);
-                    if(riverData.flowRate() < 0.01) {
+                    if (riverData.flowRate() < 0.001) {
                         continue;
                     }
                     final double x1 = incoming.x();
                     final double y1 = incoming.y();
                     if (lineSegDist(x0, y0, x1, y1, x * scale, y * scale) < 0.25) {
-                        final int val = (int) (riverData.flowRate() * 10000);
+                        if(!Double.isFinite(riverData.flowRate())) {
+                            return 0xFF0000;
+                        }
+                        final int val = (int) (flowRemap(riverData.flowRate()));
                         final int clamped = Math.max(Math.min(val, 255), 0);
                         return (clamped) | (clamped << 8) | (clamped << 16);
                     }
@@ -81,6 +90,11 @@ public class Test {
                 return data.type() == PlateType.CONTINENT ? 0xFF00 : 0xFF;
             }
         }, 2048, 2048, filename);
+    }
+
+    private static double flowRemap(final double x) {
+        final double x1 = 1 - x;
+        return (1 - (x1 * x1 * x1 * x1 * x1 * x1)) * 255;
     }
 
     public static double lineSegDist(final double vx, final double vy, final double wx, final double wy, final double px, final double py) {
