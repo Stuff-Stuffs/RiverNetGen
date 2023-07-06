@@ -15,8 +15,11 @@ public class Test {
         final int layerCount = 2;
         final Layer.Basic<PlateType> base = RiverLayers.enclaveDestructor(layerCount + 1, RiverLayers.base(seed, layerCount + 1));
         Layer.Basic<RiverData> riverBase = RiverLayers.riverBase(seed, layerCount, base);
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 2; i++) {
             riverBase = RiverLayers.grow(seed, layerCount, riverBase);
+        }
+        for (int i = 0; i < 4; i++) {
+            riverBase = RiverLayers.propagate(seed, layerCount, riverBase);
         }
         Layer<RiverData> layer = riverBase;
         for (int i = layerCount - 1; i >= 0; i--) {
