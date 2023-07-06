@@ -216,8 +216,11 @@ public final class SHMImpl implements SHM {
         if (first == null || second == null) {
             return false;
         }
-        final int longest = Math.max(first.level(), second.level());
-        for (int i = level; i < longest; i++) {
+        final int max = first.level();
+        if (max != second.level()) {
+            return false;
+        }
+        for (int i = level; i < max; i++) {
             if (first.get(i) != second.get(i)) {
                 return false;
             }
@@ -254,7 +257,7 @@ public final class SHMImpl implements SHM {
     }
 
     public static CoordinateImpl outerTruncate(final Coordinate coordinate, final int level) {
-        if (coordinate.level() < level) {
+        if (coordinate.level() <= level) {
             return new CoordinateImpl(new byte[]{});
         }
         final byte[] copy = new byte[coordinate.level()];

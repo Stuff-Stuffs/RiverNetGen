@@ -10,14 +10,16 @@ import io.github.stuff_stuffs.river_net_gen.api.util.SHM;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.Pair;
-import it.unimi.dsi.fastutil.objects.*;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ReferenceOpenCustomHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectObjectImmutablePair;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
-import java.util.function.Function;
 
 public final class RiverLayers {
     private static final Hex.Direction[] DIRECTIONS = Hex.Direction.values();
@@ -50,7 +52,7 @@ public final class RiverLayers {
         protected @Nullable WalkerNode start(final int s, final Neighbourhood<Node> neighbourhood, final RiverData context) {
             final Node node = neighbourhood.get(s);
             if (node.incoming.isEmpty()) {
-                final WalkerNode walkerNode = new WalkerNode(context.height() + 1, node.depth, context.height() + 1, node.outgoing, node.coordinate);
+                final WalkerNode walkerNode = new WalkerNode(context.height() + 1, node.depth, context.height() + 1, node.outgoing);
                 walkerNode.tiles = 1;
                 walkerNode.requiredFlowRate = 0;
                 return walkerNode;
@@ -78,7 +80,7 @@ public final class RiverLayers {
                     }
                 }
                 final double interpolated = interpolate(node.depth, node.depth + 1, context.height(), height);
-                final WalkerNode walkerNode = new WalkerNode(interpolated, node.depth, interpolated, node.outgoing, node.coordinate);
+                final WalkerNode walkerNode = new WalkerNode(interpolated, node.depth, interpolated, node.outgoing);
                 walkerNode.tiles = tiles + 1;
                 walkerNode.incomingHeights.put(incoming, new RiverData.Incoming(height, tiles, requiredFlowRate));
                 walkerNode.requiredFlowRate = requiredFlowRate;
@@ -113,25 +115,26 @@ public final class RiverLayers {
             }
             final WalkerNode walkerNode;
             if (edgeAdjacent) {
-                walkerNode = new WalkerNode(minHeight, minDepth, minHeight, node.outgoing, node.coordinate);
+                walkerNode = new WalkerNode(minHeight, minDepth, minHeight, node.outgoing);
             } else {
                 final double interpolated = interpolate(node.depth, minDepth, context.height(), minHeight);
-                walkerNode = new WalkerNode(minHeight, minDepth, interpolated, node.outgoing, node.coordinate);
+                walkerNode = new WalkerNode(minHeight, minDepth, interpolated, node.outgoing);
             }
             double requiredFlowRate = 0;
             long tiles = 1;
             for (final Hex.Direction direction : node.incoming.keySet()) {
                 final int n = neighbourhood.offset(s, direction);
                 if (neighbourhood.inCenterCluster(n)) {
-                    final double rate = states[n].requiredFlowRate;
-                    requiredFlowRate = requiredFlowRate + rate;
+                    final double flowRate = states[n].requiredFlowRate;
+                    requiredFlowRate = requiredFlowRate + flowRate;
                     tiles = tiles + states[n].tiles;
-                    walkerNode.incomingHeights.put(direction, new RiverData.Incoming(states[n].height, states[n].tiles, rate));
+                    walkerNode.incomingHeights.put(direction, new RiverData.Incoming(states[n].height, states[n].tiles, flowRate));
                 } else {
                     final RiverData.Incoming incoming = context.incoming().get(direction);
-                    walkerNode.incomingHeights.put(direction, new RiverData.Incoming(incoming.height(), incoming.tiles() * 7, incoming.flowRate()));
+                    final long expandedTiles = incoming.tiles() * 7;
+                    walkerNode.incomingHeights.put(direction, new RiverData.Incoming(incoming.height(), expandedTiles, incoming.flowRate()));
                     requiredFlowRate = requiredFlowRate + incoming.flowRate();
-                    tiles = tiles + incoming.tiles() * 7;
+                    tiles = tiles + expandedTiles;
                 }
             }
             walkerNode.requiredFlowRate = requiredFlowRate;
@@ -147,8 +150,8 @@ public final class RiverLayers {
     public static final NeighbourhoodWalker<RiverData, WalkerNode, WalkerNode, RiverData> FLOW_FILL = new NeighbourhoodWalker<>(RiverData.class, WalkerNode.class) {
         @Override
         protected @Nullable WalkerNode start(final int s, final Neighbourhood<WalkerNode> neighbourhood, final RiverData context) {
-            final Hex.Direction outgoing = context.outgoing();
             final WalkerNode node = neighbourhood.get(s);
+            final Hex.Direction outgoing = node.outgoing;
             if (outgoing == null || !neighbourhood.inCenterCluster(neighbourhood.offset(s, outgoing))) {
                 node.flowRate = context.flowRate();
                 return node;
@@ -159,10 +162,11 @@ public final class RiverLayers {
         @Override
         protected @Nullable WalkerNode process(final int s, final WalkerNode[] states, final Neighbourhood<WalkerNode> neighbourhood, final RiverData context) {
             final WalkerNode node = neighbourhood.get(s);
-            final WalkerNode parent = states[neighbourhood.offset(s, node.outgoing)];
+            final int offset = neighbourhood.offset(s, node.outgoing);
+            final WalkerNode parent = states[offset];
             if (parent != null) {
                 final double overFlow = parent.flowRate - parent.requiredFlowRate;
-                node.flowRate = node.requiredFlowRate + overFlow * (node.tiles / (double) (parent.tiles - 1));
+                node.flowRate = node.requiredFlowRate + overFlow * (node.tiles / (double) (parent.tiles));
                 return node;
             }
             return null;
@@ -228,7 +232,7 @@ public final class RiverLayers {
         final int hashCode = strategy.hashCode(coordinate);
         final int start = HashCommon.mix(seed ^ hashCode) ^ HashCommon.murmurHash3(hashCode);
         final long data = HashCommon.murmurHash3(HashCommon.mix((long) start | (((long) start) << 32L)) + 123456);
-        return 1;//(data >>> 11) * 0x1.0p-53;
+        return 1 + (data >>> 11) * 0x1.0p-53;
     }
 
     public static Layer.Basic<RiverData> grow(final int seed, final int level, final Layer<RiverData> prev) {
@@ -283,29 +287,29 @@ public final class RiverLayers {
         });
     }
 
-    public static Layer.Basic<RiverData> propagate(int seed, final int level, final Layer<RiverData> prev) {
-        SHM shm = SHM.create();
-        SHM.LevelCache cache = SHM.createCache(level);
+    public static Layer.Basic<RiverData> propagate(final int seed, final int level, final Layer<RiverData> prev) {
+        final SHM shm = SHM.create();
+        final SHM.LevelCache cache = SHM.createCache(level);
         return new Layer.Basic<>(coordinate -> {
-            RiverData data = prev.get(coordinate);
+            final RiverData data = prev.get(coordinate);
             double base = 0;
             long tiles = 1;
-            if(data.incoming().isEmpty()) {
+            if (data.incoming().isEmpty()) {
                 return data;
             }
-            if(data.type()==PlateType.CONTINENT) {
-                base = flowBase(coordinate, seed,cache.outer());
+            if (data.type() == PlateType.CONTINENT) {
+                base = flowBase(coordinate, seed, cache.outer());
             }
-            Map<Hex.Direction, RiverData.Incoming> incoming = new EnumMap<>(Hex.Direction.class);
-            for (Map.Entry<Hex.Direction, RiverData.Incoming> entry : data.incoming().entrySet()) {
-                SHM.Coordinate neighbourCoordinate = shm.add(coordinate, cache.offset(entry.getKey()));
-                RiverData riverData = prev.get(neighbourCoordinate);
+            final Map<Hex.Direction, RiverData.Incoming> incoming = new EnumMap<>(Hex.Direction.class);
+            for (final Map.Entry<Hex.Direction, RiverData.Incoming> entry : data.incoming().entrySet()) {
+                final SHM.Coordinate neighbourCoordinate = shm.add(coordinate, cache.offset(entry.getKey()));
+                final RiverData riverData = prev.get(neighbourCoordinate);
                 incoming.put(entry.getKey(), new RiverData.Incoming(riverData.height(), riverData.tiles(), riverData.flowRate()));
                 base = base + riverData.flowRate();
                 tiles = tiles + riverData.tiles();
             }
-            if(tiles!=data.tiles()) {
-                return new RiverData(data.type(), data.incoming(), data.outgoing(), data.height(), base, tiles);
+            if (tiles != data.tiles()) {
+                return new RiverData(data.type(), incoming, data.outgoing(), data.height(), base, tiles);
             }
             return data;
         });
@@ -335,9 +339,8 @@ public final class RiverLayers {
             for (final Hex.Direction direction : DIRECTIONS) {
                 final SHM.Coordinate offset = shm.add(truncated, cache.offset(direction.rotateC()));
                 if (parentData.incoming().containsKey(direction)) {
-                    final RiverData neighbourData = prev.get(outerCache.offset(direction));
                     final RiverData.Incoming incoming = parentData.incoming().get(direction);
-                    final RiverData riverData = new RiverData(PlateType.OCEAN, Map.of(direction, incoming), null, 0, neighbourData.flowRate(), 1 + neighbourData.tiles());
+                    final RiverData riverData = new RiverData(PlateType.OCEAN, Map.of(direction, incoming), null, 0, incoming.flowRate(), 1 + incoming.tiles() * 7);
                     dataArr[offset.get(level)] = riverData;
                 } else {
                     dataArr[offset.get(level)] = empty;
@@ -502,17 +505,14 @@ public final class RiverLayers {
         private final double height;
         private final Hex.Direction outgoing;
         private long tiles;
-        private final SHM.Coordinate coordinate;
         private double requiredFlowRate = Double.NaN;
         private double flowRate = Double.NaN;
 
-        private WalkerNode(final double minHeightAlongPath, final int minDepthAlongPath, final double height, final Hex.Direction outgoing, final SHM.Coordinate coordinate) {
+        private WalkerNode(final double minHeightAlongPath, final int minDepthAlongPath, final double height, final Hex.Direction outgoing) {
             this.minHeightAlongPath = minHeightAlongPath;
             this.minDepthAlongPath = minDepthAlongPath;
             this.height = height;
             this.outgoing = outgoing;
-            this.tiles = tiles;
-            this.coordinate = coordinate;
         }
     }
 

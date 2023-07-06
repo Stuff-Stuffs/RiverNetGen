@@ -14,11 +14,14 @@ public class NeighbourhoodImpl<T> implements Neighbourhood<T> {
         PACKED_ADDITION_TABLE = new int[7 * 7];
         final SHM shm = SHM.create();
         for (int i = 0; i < 7; i++) {
-            final SHM.Coordinate first = new SHMImpl.CoordinateImpl(new byte[]{(byte) i});
+            final SHM.Coordinate first = new SHMImpl.CoordinateImpl(i == 0 ? new byte[0] : new byte[]{(byte) i});
             for (int j = 0; j < 7; j++) {
-                final SHM.Coordinate second = new SHMImpl.CoordinateImpl(new byte[]{(byte) j});
+                final SHM.Coordinate second = new SHMImpl.CoordinateImpl(j == 0 ? new byte[0] : new byte[]{(byte) j});
                 final SHM.Coordinate add = shm.add(first, second);
-                PACKED_ADDITION_TABLE[i + j * 7] = add.get(0) + add.get(1) * 7;
+                if(add.level() > 2) {
+                    throw new IllegalStateException();
+                }
+                PACKED_ADDITION_TABLE[i + 7 * j] = add.get(0) + add.get(1) * 7;
             }
         }
     }
@@ -55,6 +58,9 @@ public class NeighbourhoodImpl<T> implements Neighbourhood<T> {
 
     @Override
     public int offset(final int s, final Hex.Direction offset) {
+        if (s > 7) {
+            throw new IllegalStateException("Tried to offset outside neighbourhood!");
+        }
         final int offsetId = s + SHMImpl.idFromDirection(offset) * 7;
         if (offsetId >= 7 * 7) {
             throw new IllegalStateException("Tried to offset outside neighbourhood!");
