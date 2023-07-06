@@ -11,8 +11,8 @@ import io.github.stuff_stuffs.river_net_gen.impl.util.SHMImpl;
 
 public class Test {
     public static void main(final String[] args) {
-        final int seed = 41211;
-        final int layerCount = 5;
+        final int seed = 777;
+        final int layerCount = 7;
         final Layer.Basic<PlateType> base = RiverLayers.enclaveDestructor(layerCount + 1, RiverLayers.base(seed, layerCount + 1));
         Layer.Basic<RiverData> riverBase = RiverLayers.riverBase(seed, layerCount, base);
         for (int i = 0; i < 2; i++) {
@@ -91,6 +91,9 @@ public class Test {
     }
 
     private static double flowRemap(final double x) {
+        if(x < 0.0001) {
+            return 0;
+        }
         return Math.pow(x, 1 / 3.0) * 255;
     }
 

@@ -387,11 +387,9 @@ public final class RiverLayers {
             }
             final byte index = offset.get(level);
             final double v = weight(parentData.outgoing(), direction);
-            if (v < weights[index] || Double.isNaN(weights[index])) {
-                weights[index] = v;
-                incoming[index] = start;
-                incomingDirections[index] = direction.opposite();
-            }
+            weights[index] = v;
+            incoming[index] = start;
+            incomingDirections[index] = direction.opposite();
         }
 
         for (int i = 1; i < 7; i++) {

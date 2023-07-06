@@ -216,10 +216,7 @@ public final class SHMImpl implements SHM {
         if (first == null || second == null) {
             return false;
         }
-        final int max = first.level();
-        if (max != second.level()) {
-            return false;
-        }
+        final int max = Math.max(first.level(), second.level());
         for (int i = level; i < max; i++) {
             if (first.get(i) != second.get(i)) {
                 return false;
