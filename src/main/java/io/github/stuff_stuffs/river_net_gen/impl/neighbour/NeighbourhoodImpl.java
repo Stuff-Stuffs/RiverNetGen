@@ -18,7 +18,7 @@ public class NeighbourhoodImpl<T> implements Neighbourhood<T> {
             for (int j = 0; j < 7; j++) {
                 final SHM.Coordinate second = new SHMImpl.CoordinateImpl(j == 0 ? new byte[0] : new byte[]{(byte) j});
                 final SHM.Coordinate add = shm.add(first, second);
-                if(add.level() > 2) {
+                if (add.level() > 2) {
                     throw new IllegalStateException();
                 }
                 PACKED_ADDITION_TABLE[i + 7 * j] = add.get(0) + add.get(1) * 7;
@@ -31,6 +31,7 @@ public class NeighbourhoodImpl<T> implements Neighbourhood<T> {
     private final Object[] cache;
     private final SHM shm;
     private final SHM.Coordinate center;
+    private final SHM.MutableCoordinate mutable = SHM.createMutable();
 
     public NeighbourhoodImpl(final Function<SHM.Coordinate, T> delegate, final SHM.Coordinate[] offsets, final SHM.Coordinate center) {
         this.delegate = delegate;
@@ -51,9 +52,17 @@ public class NeighbourhoodImpl<T> implements Neighbourhood<T> {
         if (o != null) {
             return (T) o;
         }
-        final T ret = delegate.apply(toGlobal(s));
+        final T ret = delegate.apply(toGlobalMut(s));
         cache[s] = ret;
         return ret;
+    }
+
+    private SHM.Coordinate toGlobalMut(final int s) {
+        if (s == 0) {
+            return center;
+        }
+        shm.addMutable(center, offsets[s], mutable);
+        return mutable;
     }
 
     @Override

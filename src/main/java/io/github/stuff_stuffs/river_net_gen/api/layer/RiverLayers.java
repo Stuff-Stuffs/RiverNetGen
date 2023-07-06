@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.function.Function;
 
 public final class RiverLayers {
     private static final Hex.Direction[] DIRECTIONS = Hex.Direction.values();
@@ -207,16 +208,18 @@ public final class RiverLayers {
         final SHM shm = SHM.create(level);
         final SHM.LevelCache cache = SHM.createCache(level);
         final NeighbourhoodFactory factory = NeighbourhoodFactory.create(level);
+        SHM.MutableCoordinate mutable = SHM.createMutable();
+        final Hash.Strategy<SHM.Coordinate> outer = cache.outer();
         return new Layer.Basic<>(coordinate -> {
             final PlateType type = prev.get(coordinate);
             if (type == PlateType.OCEAN) {
                 final Map<Hex.Direction, RiverData.Incoming> incoming = new EnumMap<>(Hex.Direction.class);
                 double flowSum = 0;
                 for (final Hex.Direction direction : DIRECTIONS) {
-                    final SHM.Coordinate offset = shm.add(coordinate, cache.offset(direction));
-                    final Hex.Direction adjacentOutgoing = outgoingBase(offset, factory.build(offset, prev), seed, cache);
+                    shm.addMutable(coordinate, cache.offset(direction), mutable);
+                    final Hex.Direction adjacentOutgoing = outgoingBase(mutable, factory.build(mutable, prev), seed, cache);
                     if (adjacentOutgoing != null && adjacentOutgoing.opposite() == direction) {
-                        final double flowBase = flowBase(offset, seed, cache.outer());
+                        final double flowBase = flowBase(mutable, seed, outer);
                         incoming.put(direction, new RiverData.Incoming(1, 1, flowBase));
                         flowSum = flowSum + flowBase;
                     }
@@ -224,7 +227,7 @@ public final class RiverLayers {
                 return new RiverData(PlateType.OCEAN, incoming, null, 0, flowSum, 1);
             }
             final Hex.@Nullable Direction chosen = outgoingBase(coordinate, factory.build(coordinate, prev), seed, cache);
-            return new RiverData(PlateType.CONTINENT, Collections.emptyMap(), chosen, 1, flowBase(coordinate, seed, cache.outer()), 1);
+            return new RiverData(PlateType.CONTINENT, Collections.emptyMap(), chosen, 1, flowBase(coordinate, seed, outer), 1);
         });
     }
 
@@ -239,6 +242,7 @@ public final class RiverLayers {
         final SHM shm = SHM.create();
         final SHM.LevelCache cache = SHM.createCache(level);
         final NeighbourhoodFactory factory = NeighbourhoodFactory.create(level);
+        SHM.MutableCoordinate mutable = SHM.createMutable();
         return new Layer.Basic<>(coordinate -> {
             final RiverData data = prev.get(coordinate);
             if (data.type() == PlateType.OCEAN) {
@@ -247,8 +251,8 @@ public final class RiverLayers {
                 } else {
                     final Map<Hex.Direction, RiverData.Incoming> incoming = new EnumMap<>(Hex.Direction.class);
                     for (final Hex.Direction direction : data.incoming().keySet()) {
-                        final SHM.Coordinate offset = shm.add(coordinate, cache.offset(direction));
-                        final RiverData neighbourData = prev.get(offset);
+                        shm.addMutable(coordinate, cache.offset(direction), mutable);
+                        final RiverData neighbourData = prev.get(mutable);
                         incoming.put(direction, new RiverData.Incoming(1, neighbourData.tiles(), neighbourData.flowRate()));
                     }
                     return new RiverData(PlateType.OCEAN, incoming, null, 0, data.flowRate(), data.tiles());
@@ -260,15 +264,15 @@ public final class RiverLayers {
                     if (direction == data.outgoing()) {
                         continue;
                     }
-                    final SHM.Coordinate neighbour = shm.add(coordinate, cache.offset(direction));
-                    final Neighbourhood<RiverData> neighbourhood = factory.build(neighbour, prev);
+                    shm.addMutable(coordinate, cache.offset(direction), mutable);
+                    final Neighbourhood<RiverData> neighbourhood = factory.build(mutable, prev);
                     final RiverData neighbourData = neighbourhood.get(neighbourhood.center());
                     if (neighbourData.type() == PlateType.OCEAN || neighbourData.outgoing() != null) {
                         continue;
                     }
-                    final Hex.@Nullable Direction chosen = outgoingGrow(neighbour, neighbourhood, cache.outer(), seed);
+                    final Hex.@Nullable Direction chosen = outgoingGrow(mutable, neighbourhood, cache.outer(), seed);
                     if (chosen == direction.opposite()) {
-                        incoming.put(direction, new RiverData.Incoming(data.height() + 1, 1, flowBase(neighbour, seed, cache.outer())));
+                        incoming.put(direction, new RiverData.Incoming(data.height() + 1, 1, flowBase(mutable, seed, cache.outer())));
                     }
                 }
                 if (incoming.isEmpty()) {
@@ -290,6 +294,7 @@ public final class RiverLayers {
     public static Layer.Basic<RiverData> propagate(final int seed, final int level, final Layer<RiverData> prev) {
         final SHM shm = SHM.create();
         final SHM.LevelCache cache = SHM.createCache(level);
+        SHM.MutableCoordinate mutable = SHM.createMutable();
         return new Layer.Basic<>(coordinate -> {
             final RiverData data = prev.get(coordinate);
             double base = 0;
@@ -302,8 +307,8 @@ public final class RiverLayers {
             }
             final Map<Hex.Direction, RiverData.Incoming> incoming = new EnumMap<>(Hex.Direction.class);
             for (final Map.Entry<Hex.Direction, RiverData.Incoming> entry : data.incoming().entrySet()) {
-                final SHM.Coordinate neighbourCoordinate = shm.add(coordinate, cache.offset(entry.getKey()));
-                final RiverData riverData = prev.get(neighbourCoordinate);
+                shm.addMutable(coordinate, cache.offset(entry.getKey()), mutable);
+                final RiverData riverData = prev.get(mutable);
                 incoming.put(entry.getKey(), new RiverData.Incoming(riverData.height(), riverData.tiles(), riverData.flowRate()));
                 base = base + riverData.flowRate();
                 tiles = tiles + riverData.tiles();
@@ -320,14 +325,15 @@ public final class RiverLayers {
         final SHM.LevelCache cache = SHM.createCache(level);
         final SHM.LevelCache outerCache = SHM.createCache(level + 1);
         final NeighbourhoodFactory factory = NeighbourhoodFactory.create(level);
+        CachedExpandData cachedExpandData = new CachedExpandData(level);
         final Layer<SubRiverData> dataLayer = new Layer.CachingOuter<>(new Layer.Basic<>(coordinate -> {
             final RiverData data = prev.get(coordinate);
-            return expandInternal(coordinate, data, level, shm, cache, outerCache, seed, factory, prev);
+            return expandInternal(coordinate, data, level, shm, cache, outerCache, seed, factory, cachedExpandData);
         }), 8, level + 1);
         return new Layer.Basic<>(coordinate -> dataLayer.get(coordinate).data[coordinate.get(level)]);
     }
 
-    private static SubRiverData expandInternal(final SHM.Coordinate coordinate, final RiverData parentData, final int level, final SHM shm, final SHM.LevelCache cache, final SHM.LevelCache outerCache, final int seed, final NeighbourhoodFactory factory, final Layer<RiverData> prev) {
+    private static SubRiverData expandInternal(final SHM.Coordinate coordinate, final RiverData parentData, final int level, final SHM shm, final SHM.LevelCache cache, final SHM.LevelCache outerCache, final int seed, final NeighbourhoodFactory factory, CachedExpandData cachedExpandData) {
         if (parentData.type() == PlateType.OCEAN) {
             if (parentData.incoming().isEmpty()) {
                 return new SubRiverData(new RiverData[]{parentData, parentData, parentData, parentData, parentData, parentData, parentData});
@@ -351,13 +357,7 @@ public final class RiverLayers {
         if (parentData.outgoing() == null) {
             return new SubRiverData(new RiverData[]{parentData, parentData, parentData, parentData, parentData, parentData, parentData});
         }
-        final double[] weights = new double[]{Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN};
-        final SHM.Coordinate[] incoming = new SHM.Coordinate[7];
-        final Hex.Direction[] incomingDirections = new Hex.Direction[7];
-        final Node[] nodes = new Node[7];
-        for (int i = 0; i < 7; i++) {
-            nodes[i] = new Node();
-        }
+        cachedExpandData.reset();
         final SHM.Coordinate truncated = SHM.outerTruncate(coordinate, level + 1);
         final SHM.Coordinate start = shm.add(truncated, cache.offset(parentData.outgoing().rotateC()));
         final Map<SHM.Coordinate, Pair<Hex.Direction, RiverData.Incoming>> incomingPoints = new Object2ReferenceOpenCustomHashMap<>(cache.outer());
@@ -366,11 +366,14 @@ public final class RiverLayers {
             incomingPoints.put(offset, new ObjectObjectImmutablePair<>(entry.getKey(), entry.getValue()));
         }
         final byte b = start.get(level);
+        double[] weights = cachedExpandData.weights;
+        SHM.Coordinate[] incoming = cachedExpandData.incoming;
+        Hex.Direction[] incomingDirections = cachedExpandData.incomingDirections;
+        Node[] nodes = cachedExpandData.nodes;
         weights[b] = Double.NEGATIVE_INFINITY;
         incoming[b] = shm.add(start, cache.offset(parentData.outgoing()));
         nodes[b].outgoing = parentData.outgoing();
         nodes[b].depth = 0;
-        nodes[b].coordinate = start;
         incomingDirections[b] = parentData.outgoing();
         long state = seed ^ cache.outer().hashCode(start);
         final int[] shuffle = new int[7];
@@ -410,7 +413,6 @@ public final class RiverLayers {
             nodes[minIndex].outgoing = incomingDirections[minIndex];
             nodes[minIndex].depth = nodes[incomingCell.get(level)].depth + 1;
             final SHM.Coordinate cursor = shm.add(incomingCell, cache.offset(incomingDirections[minIndex].opposite()));
-            nodes[minIndex].coordinate = cursor;
             if (incomingPoints.containsKey(cursor)) {
                 final Pair<Hex.Direction, RiverData.Incoming> pair = incomingPoints.get(cursor);
                 nodes[minIndex].incoming.put(pair.first(), pair.second().tiles());
@@ -438,13 +440,39 @@ public final class RiverLayers {
                 }
             }
         }
-        final Map<SHM.Coordinate, Node> nodeMap = new Object2ReferenceOpenCustomHashMap<>(outerCache.inner());
-        for (int i = 0; i < 7; i++) {
-            nodeMap.put(nodes[i].coordinate, nodes[i]);
-        }
-        final NeighbourhoodWalker.Result<WalkerNode> walk = FILL_DATA.walk(factory.build(truncated, nodeMap::get), parentData);
-        final NeighbourhoodWalker.Result<RiverData> flowWalk = FLOW_FILL.walk(factory.build(truncated, co -> walk.raw()[co.get(level)]), parentData);
+        cachedExpandData.nodeGetter.nodes = nodes;
+        final NeighbourhoodWalker.Result<WalkerNode> walk = FILL_DATA.walk(factory.build(truncated, cachedExpandData.nodeGetter), parentData);
+        cachedExpandData.walkerNodeGetter.nodes = walk.raw();
+        final NeighbourhoodWalker.Result<RiverData> flowWalk = FLOW_FILL.walk(factory.build(truncated, cachedExpandData.walkerNodeGetter), parentData);
         return new SubRiverData(flowWalk.raw());
+    }
+
+    private static final class NodeGetter implements Function<SHM.Coordinate, Node> {
+        private final int level;
+        private Node[] nodes;
+
+        private NodeGetter(int level) {
+            this.level = level;
+        }
+
+        @Override
+        public Node apply(SHM.Coordinate coordinate) {
+            return nodes[coordinate.get(level)];
+        }
+    }
+
+    private static final class WalkerNodeGetter implements Function<SHM.Coordinate, WalkerNode> {
+        private final int level;
+        private WalkerNode[] nodes;
+
+        private WalkerNodeGetter(int level) {
+            this.level = level;
+        }
+
+        @Override
+        public WalkerNode apply(SHM.Coordinate coordinate) {
+            return nodes[coordinate.get(level)];
+        }
     }
 
     private static double interpolate(final int depth, final int maxDepth, final double height, final double endHeight) {
@@ -493,7 +521,6 @@ public final class RiverLayers {
         private Hex.@Nullable Direction outgoing;
         private final Object2LongMap<Hex.Direction> incoming = new Object2LongOpenHashMap<>();
         private int depth = -1;
-        private SHM.Coordinate coordinate = null;
     }
 
     public static final class WalkerNode {
@@ -511,6 +538,34 @@ public final class RiverLayers {
             this.minDepthAlongPath = minDepthAlongPath;
             this.height = height;
             this.outgoing = outgoing;
+        }
+    }
+
+    private static final class CachedExpandData {
+        private final double[] weights = new double[]{Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN};
+        private final SHM.Coordinate[] incoming = new SHM.Coordinate[7];
+        private final Hex.Direction[] incomingDirections = new Hex.Direction[7];
+        private final Node[] nodes = new Node[7];
+        private final NodeGetter nodeGetter;
+        private final WalkerNodeGetter walkerNodeGetter;
+
+        public CachedExpandData(int level) {
+            for (int i = 0; i < 7; i++) {
+                nodes[i] = new Node();
+            }
+            nodeGetter = new NodeGetter(level);
+            walkerNodeGetter = new WalkerNodeGetter(level);
+        }
+
+        public void reset() {
+            Arrays.fill(weights, Double.NaN);
+            Arrays.fill(incoming, null);
+            Arrays.fill(incomingDirections, null);
+            for (Node node : nodes) {
+                node.outgoing = null;
+                node.incoming.clear();
+                node.depth = -1;
+            }
         }
     }
 

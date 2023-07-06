@@ -85,6 +85,10 @@ public final class SHMImpl implements SHM {
 
     @Override
     public CoordinateImpl fromHex(final Hex.Coordinate coordinate, final int level) {
+        return new CoordinateImpl(Arrays.copyOf(buffer0, fromHex0(coordinate, level)));
+    }
+
+    private int fromHex0(final Hex.Coordinate coordinate, final int level) {
         int q = coordinate.q();
         int r = coordinate.r();
         int l = 0;
@@ -105,7 +109,7 @@ public final class SHMImpl implements SHM {
             q = qt;
             r = rt;
         }
-        return new CoordinateImpl(Arrays.copyOf(buffer0, lastNonZero));
+        return lastNonZero;
     }
 
     @Override
@@ -126,6 +130,10 @@ public final class SHMImpl implements SHM {
 
     @Override
     public CoordinateImpl add(final Coordinate first, final Coordinate second) {
+        return new CoordinateImpl(Arrays.copyOf(buffer0, add0(first, second) + 1));
+    }
+
+    private int add0(final Coordinate first, final Coordinate second) {
         final int firstLevel = first.level();
         int len = Math.max(firstLevel, second.level());
         Arrays.fill(buffer1, (byte) 0);
@@ -151,7 +159,28 @@ public final class SHMImpl implements SHM {
                 j++;
             }
         }
-        return new CoordinateImpl(Arrays.copyOf(buffer0, lastNonZero + 1));
+        return lastNonZero;
+    }
+
+    @Override
+    public void fromHexMutable(final Hex.Coordinate coordinate, final MutableCoordinate result) {
+        fromHexMutable(coordinate, defaultLevel, result);
+    }
+
+    @Override
+    public void fromHexMutable(final Hex.Coordinate coordinate, final int level, final MutableCoordinate result) {
+        final int last = fromHex0(coordinate, level);
+        final MutableCoordinateImpl impl = (MutableCoordinateImpl) result;
+        System.arraycopy(buffer0, 0, impl.data, 0, last);
+        impl.last = last;
+    }
+
+    @Override
+    public void addMutable(final Coordinate first, final Coordinate second, final MutableCoordinate result) {
+        final int last = add0(first, second) + 1;
+        final MutableCoordinateImpl impl = (MutableCoordinateImpl) result;
+        System.arraycopy(buffer0, 0, impl.data, 0, last);
+        impl.last = last;
     }
 
     public static final class CoordinateImpl implements Coordinate {
@@ -172,6 +201,40 @@ public final class SHMImpl implements SHM {
                 return 0;
             }
             return data[level];
+        }
+
+        @Override
+        public Coordinate toImmutable() {
+            return null;
+        }
+    }
+
+    public static final class MutableCoordinateImpl implements MutableCoordinate {
+        private final byte[] data;
+        private int last;
+
+        public MutableCoordinateImpl() {
+            data = new byte[MAX_LEVEL];
+            last = 0;
+        }
+
+        @Override
+        public int level() {
+            return last;
+        }
+
+        @Override
+        public byte get(final int level) {
+            if (level < last) {
+                return data[level];
+            } else {
+                return 0;
+            }
+        }
+
+        @Override
+        public Coordinate toImmutable() {
+            return new CoordinateImpl(Arrays.copyOf(data, last));
         }
     }
 

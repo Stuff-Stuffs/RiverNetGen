@@ -12,6 +12,12 @@ public interface SHM {
 
     Coordinate add(Coordinate first, Coordinate second);
 
+    void fromHexMutable(Hex.Coordinate coordinate, MutableCoordinate result);
+
+    void fromHexMutable(Hex.Coordinate coordinate, int level, MutableCoordinate result);
+
+    void addMutable(Coordinate first, Coordinate second, MutableCoordinate result);
+
     static SHM create(final int level) {
         return new SHMImpl(level);
     }
@@ -44,10 +50,19 @@ public interface SHM {
         return SHMImpl.outerEquals(first, second, level);
     }
 
+    static MutableCoordinate createMutable() {
+        return new SHMImpl.MutableCoordinateImpl();
+    }
+
     interface Coordinate {
         int level();
 
         byte get(int level);
+
+        Coordinate toImmutable();
+    }
+
+    interface MutableCoordinate extends Coordinate {
     }
 
     interface LevelCache {
