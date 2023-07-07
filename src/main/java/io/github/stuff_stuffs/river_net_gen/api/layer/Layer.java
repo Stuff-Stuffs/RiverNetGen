@@ -54,7 +54,7 @@ public sealed interface Layer<T> extends Function<SHM.Coordinate, T> {
                 }
             }
             final T val = delegate.get(coordinate);
-            keys[pos] = coordinate;
+            keys[pos] = coordinate.toImmutable();
             values[pos] = val;
             hashes[pos] = hash;
             return val;

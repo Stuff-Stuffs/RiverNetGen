@@ -328,12 +328,14 @@ public final class RiverLayers {
         final CachedExpandData cachedExpandData = new CachedExpandData(level);
         final Layer<SubRiverData> dataLayer = new Layer.CachingOuter<>(new Layer.Basic<>(coordinate -> {
             final RiverData data = prev.get(coordinate);
-            return expandInternal(coordinate, data, level, shm, cache, outerCache, seed, factory, cachedExpandData);
+            return zoomInternal(coordinate, data, level, shm, cache, outerCache, seed, factory, cachedExpandData);
         }), 8, level + 1);
         return new Layer.Basic<>(coordinate -> dataLayer.get(coordinate).data[coordinate.get(level)]);
     }
 
-    private static SubRiverData expandInternal(final SHM.Coordinate coordinate, final RiverData parentData, final int level, final SHM shm, final SHM.LevelCache cache, final SHM.LevelCache outerCache, final int seed, final NeighbourhoodFactory factory, final CachedExpandData cachedExpandData) {
+    private static SubRiverData zoomInternal(final SHM.Coordinate coordinate, final RiverData parentData, final int level, final SHM shm, final SHM.LevelCache cache, final SHM.LevelCache outerCache, final int seed, final NeighbourhoodFactory factory, final CachedExpandData cachedExpandData) {
+        final SHM.MutableCoordinate scratch0 = cachedExpandData.scratch0;
+        final SHM.MutableCoordinate scratch1 = cachedExpandData.scratch1;
         if (parentData.type() == PlateType.OCEAN) {
             if (parentData.incoming().isEmpty()) {
                 return new SubRiverData(new RiverData[]{parentData, parentData, parentData, parentData, parentData, parentData, parentData});
@@ -343,13 +345,13 @@ public final class RiverLayers {
             final RiverData empty = new RiverData(PlateType.OCEAN, Collections.emptyMap(), null, 0, 0, 0);
             dataArr[truncated.get(level)] = empty;
             for (final Hex.Direction direction : DIRECTIONS) {
-                final SHM.Coordinate offset = shm.add(truncated, cache.offset(direction.rotateC()));
+                shm.addMutable(truncated, cache.offset(direction.rotateC()), scratch0);
                 if (parentData.incoming().containsKey(direction)) {
                     final RiverData.Incoming incoming = parentData.incoming().get(direction);
                     final RiverData riverData = new RiverData(PlateType.OCEAN, Map.of(direction, incoming), null, 0, incoming.flowRate(), 1 + incoming.tiles() * 7);
-                    dataArr[offset.get(level)] = riverData;
+                    dataArr[scratch0.get(level)] = riverData;
                 } else {
-                    dataArr[offset.get(level)] = empty;
+                    dataArr[scratch0.get(level)] = empty;
                 }
             }
             return new SubRiverData(dataArr);
@@ -384,14 +386,14 @@ public final class RiverLayers {
         final Hex.Direction[] shuffledDirections = Arrays.copyOf(DIRECTIONS, DIRECTIONS.length);
         shuffle(shuffledDirections, HashCommon.mix(state ^ 0xFFFF_0007));
         for (final Hex.Direction direction : shuffledDirections) {
-            final SHM.Coordinate offset = shm.add(start, cache.offset(direction));
-            if (!outerCache.outer().equals(start, offset)) {
+            shm.addMutable(start, cache.offset(direction), scratch0);
+            if (!outerCache.outer().equals(start, scratch0)) {
                 continue;
             }
-            final byte index = offset.get(level);
+            final byte index = scratch0.get(level);
             final Hex.@Nullable Direction incomingIncoming;
-            if (incomingPoints.containsKey(offset)) {
-                incomingIncoming = incomingPoints.get(offset).first();
+            if (incomingPoints.containsKey(scratch0)) {
+                incomingIncoming = incomingPoints.get(scratch0).first();
             } else {
                 incomingIncoming = null;
             }
@@ -418,9 +420,9 @@ public final class RiverLayers {
             nodes[incomingCell.get(level)].incoming.put(incomingDirections[minIndex].opposite(), -1);
             nodes[minIndex].outgoing = incomingDirections[minIndex];
             nodes[minIndex].depth = nodes[incomingCell.get(level)].depth + 1;
-            final SHM.Coordinate cursor = shm.add(incomingCell, cache.offset(incomingDirections[minIndex].opposite()));
-            if (incomingPoints.containsKey(cursor)) {
-                final Pair<Hex.Direction, RiverData.Incoming> pair = incomingPoints.get(cursor);
+            shm.addMutable(incomingCell, cache.offset(incomingDirections[minIndex].opposite()), scratch0);
+            if (incomingPoints.containsKey(scratch0)) {
+                final Pair<Hex.Direction, RiverData.Incoming> pair = incomingPoints.get(scratch0);
                 nodes[minIndex].incoming.put(pair.first(), pair.second().tiles());
             }
             if (nodes[minIndex].depth == 3) {
@@ -428,14 +430,14 @@ public final class RiverLayers {
             }
             for (int j = 0; j < DIRECTIONS.length; j++) {
                 final Hex.Direction direction = shuffledDirections[j];
-                final SHM.Coordinate offset = shm.add(cursor, cache.offset(direction));
-                if (!outerCache.outer().equals(start, offset)) {
+                shm.addMutable(scratch0, cache.offset(direction), scratch1);
+                if (!outerCache.outer().equals(start, scratch1)) {
                     continue;
                 }
-                final byte index = offset.get(level);
+                final byte index = scratch1.get(level);
                 final Hex.@Nullable Direction incomingIncoming;
-                if (incomingPoints.containsKey(offset)) {
-                    incomingIncoming = incomingPoints.get(offset).first();
+                if (incomingPoints.containsKey(scratch1)) {
+                    incomingIncoming = incomingPoints.get(scratch1).first();
                 } else {
                     incomingIncoming = null;
                 }
@@ -443,11 +445,11 @@ public final class RiverLayers {
                 final double weight = weights[index];
                 if (v < weight || Double.isNaN(weights[index])) {
                     weights[index] = v;
-                    incoming[index] = cursor;
+                    incoming[index] = scratch0.toImmutable();
                     incomingDirections[index] = direction.opposite();
                 } else if (v == weight && (state & 1) == 0) {
                     state = HashCommon.mix(state + 123456) ^ HashCommon.mix(state - 123456);
-                    incoming[index] = cursor;
+                    incoming[index] = scratch0.toImmutable();
                     incomingDirections[index] = direction.opposite();
                 }
             }
@@ -569,6 +571,8 @@ public final class RiverLayers {
         private final Node[] nodes = new Node[7];
         private final NodeGetter nodeGetter;
         private final WalkerNodeGetter walkerNodeGetter;
+        private final SHM.MutableCoordinate scratch0;
+        private final SHM.MutableCoordinate scratch1;
 
         public CachedExpandData(final int level) {
             for (int i = 0; i < 7; i++) {
@@ -576,6 +580,8 @@ public final class RiverLayers {
             }
             nodeGetter = new NodeGetter(level);
             walkerNodeGetter = new WalkerNodeGetter(level);
+            scratch0 = SHM.createMutable();
+            scratch1 = SHM.createMutable();
         }
 
         public void reset() {

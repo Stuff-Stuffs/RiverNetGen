@@ -4,6 +4,8 @@ import io.github.stuff_stuffs.river_net_gen.impl.util.SHMImpl;
 import it.unimi.dsi.fastutil.Hash;
 
 public interface SHM {
+    SHM MAX_LEVEL = SHM.create();
+
     Coordinate fromHex(Hex.Coordinate coordinate);
 
     Coordinate fromHex(Hex.Coordinate coordinate, int level);

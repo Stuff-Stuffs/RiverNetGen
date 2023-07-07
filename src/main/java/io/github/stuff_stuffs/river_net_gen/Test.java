@@ -26,7 +26,7 @@ public class Test {
             final Layer.Basic<RiverData> zoom = RiverLayers.zoom(i, seed, layer);
             layer = zoom;
         }
-        final double scale = 1 / 5.0;
+        final double scale = 1 / 1.0;
         draw(scale, 0, "triver0.png", layer, false);
     }
 
@@ -87,7 +87,7 @@ public class Test {
             } else {
                 return data.type() == PlateType.CONTINENT ? 0xFF00 : 0xFF;
             }
-        }, 2048, 2048, filename);
+        }, 8192, 8192, filename);
     }
 
     private static double flowRemap(final double x) {

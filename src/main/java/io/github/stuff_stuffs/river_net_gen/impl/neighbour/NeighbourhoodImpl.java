@@ -28,8 +28,6 @@ public class NeighbourhoodImpl<T> implements Neighbourhood<T> {
 
     private final Function<SHM.Coordinate, T> delegate;
     private final SHM.Coordinate[] offsets;
-    private final Object[] cache;
-    private final SHM shm;
     private final SHM.Coordinate center;
     private final SHM.MutableCoordinate mutable = SHM.createMutable();
 
@@ -37,8 +35,6 @@ public class NeighbourhoodImpl<T> implements Neighbourhood<T> {
         this.delegate = delegate;
         this.offsets = offsets;
         this.center = center;
-        cache = new Object[7 * 7];
-        shm = SHM.create();
     }
 
     @Override
@@ -48,20 +44,14 @@ public class NeighbourhoodImpl<T> implements Neighbourhood<T> {
 
     @Override
     public T get(final int s) {
-        final Object o = cache[s];
-        if (o != null) {
-            return (T) o;
-        }
-        final T ret = delegate.apply(toGlobalMut(s));
-        cache[s] = ret;
-        return ret;
+        return delegate.apply(toGlobalMut(s));
     }
 
     private SHM.Coordinate toGlobalMut(final int s) {
         if (s == 0) {
             return center;
         }
-        shm.addMutable(center, offsets[s], mutable);
+        SHM.MAX_LEVEL.addMutable(center, offsets[s], mutable);
         return mutable;
     }
 
@@ -87,6 +77,6 @@ public class NeighbourhoodImpl<T> implements Neighbourhood<T> {
         if (s == 0) {
             return center;
         }
-        return shm.add(center, offsets[s]);
+        return SHM.MAX_LEVEL.add(center, offsets[s]);
     }
 }
