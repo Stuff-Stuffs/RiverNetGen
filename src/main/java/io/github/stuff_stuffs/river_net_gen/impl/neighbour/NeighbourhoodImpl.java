@@ -14,9 +14,9 @@ public class NeighbourhoodImpl<T> implements Neighbourhood<T> {
         PACKED_ADDITION_TABLE = new int[7 * 7];
         final SHM shm = SHM.create();
         for (int i = 0; i < 7; i++) {
-            final SHM.Coordinate first = new SHMImpl.CoordinateImpl(i == 0 ? new byte[0] : new byte[]{(byte) i});
+            final SHM.Coordinate first = new SHMImpl.CoordinateImpl(i, (byte) SHMImpl.level(i));
             for (int j = 0; j < 7; j++) {
-                final SHM.Coordinate second = new SHMImpl.CoordinateImpl(j == 0 ? new byte[0] : new byte[]{(byte) j});
+                final SHM.Coordinate second = new SHMImpl.CoordinateImpl(j, (byte) SHMImpl.level(j));
                 final SHM.Coordinate add = shm.add(first, second);
                 if (add.level() > 2) {
                     throw new IllegalStateException();

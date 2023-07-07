@@ -12,7 +12,7 @@ import io.github.stuff_stuffs.river_net_gen.impl.util.SHMImpl;
 public class Test {
     public static void main(final String[] args) {
         final int seed = 777;
-        final int layerCount = 7;
+        final int layerCount = 4;
         final Layer.Basic<PlateType> base = RiverLayers.enclaveDestructor(layerCount + 1, RiverLayers.base(seed, layerCount + 1));
         Layer.Basic<RiverData> riverBase = RiverLayers.riverBase(seed, layerCount, base);
         for (int i = 0; i < 2; i++) {
@@ -26,7 +26,7 @@ public class Test {
             final Layer.Basic<RiverData> zoom = RiverLayers.zoom(i, seed, layer);
             layer = zoom;
         }
-        final double scale = 1 / 12.0;
+        final double scale = 1 / 5.0;
         draw(scale, 0, "triver0.png", layer, false);
     }
 
@@ -45,7 +45,7 @@ public class Test {
 
                 final double x1 = outgoing.x();
                 final double y1 = outgoing.y();
-                double flowWidth = flowRemap(data.flowRate());
+                final double flowWidth = flowRemap(data.flowRate());
                 if (lineSegDist(x0, y0, x1, y1, x * scale, y * scale) < flowWidth / 255.0) {
                     if (!Double.isFinite(data.flowRate())) {
                         return 0xFF0000;
@@ -87,11 +87,11 @@ public class Test {
             } else {
                 return data.type() == PlateType.CONTINENT ? 0xFF00 : 0xFF;
             }
-        }, 8192, 8192, filename);
+        }, 2048, 2048, filename);
     }
 
     private static double flowRemap(final double x) {
-        if(x < 0.0001) {
+        if (x < 0.0001) {
             return 0;
         }
         return Math.pow(x, 1 / 3.0) * 255;
