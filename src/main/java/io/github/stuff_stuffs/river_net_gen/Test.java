@@ -10,9 +10,11 @@ import io.github.stuff_stuffs.river_net_gen.api.util.SHM;
 import io.github.stuff_stuffs.river_net_gen.impl.util.SHMImpl;
 
 public class Test {
+
+
     public static void main(final String[] args) {
-        final int seed = 777;
-        final int layerCount = 4;
+        final int seed = 777431342;
+        final int layerCount = 5;
         final Layer.Basic<PlateType> base = RiverLayers.enclaveDestructor(layerCount + 1, RiverLayers.base(seed, layerCount + 1));
         Layer.Basic<RiverData> riverBase = RiverLayers.riverBase(seed, layerCount, base);
         for (int i = 0; i < 2; i++) {
@@ -26,72 +28,117 @@ public class Test {
             final Layer.Basic<RiverData> zoom = RiverLayers.zoom(i, seed, layer);
             layer = zoom;
         }
-        final double scale = 1 / 1.0;
-        draw(scale, 0, "triver0.png", layer, false);
+        final double scale = 1 / 6.0;
+        draw(scale, "triver", layer, true, true, true);
     }
 
-    private static void draw(final double scale, final int level, final String filename, final Layer<RiverData> layer, final boolean heightMap) {
+    private static void draw(final double scale, final String prefix, final Layer<RiverData> layer, final boolean terrain, final boolean heightMap, final boolean tiles) {
         final SHM shm = SHM.create();
-        final SHM.LevelCache cache = SHM.createCache(level);
-        ImageOut.draw((x, y) -> {
+        final SHM.LevelCache baseLevel = SHM.createCache(0);
+        final int count = (terrain ? 1 : 0) + (heightMap ? 1 : 0) + (tiles ? 1 : 0);
+        final String[] files = new String[count];
+        int id = 0;
+        final int terrainId;
+        if (terrain) {
+            files[id] = prefix + "Terrain.png";
+            terrainId = id++;
+        } else {
+            terrainId = -1;
+        }
+        final int heightmapId;
+        if (heightMap) {
+            files[id] = prefix + "HeightMap.png";
+            heightmapId = id++;
+        } else {
+            heightmapId = -1;
+        }
+        final int tilesId;
+        if (tiles) {
+            files[id] = prefix + "Tiles.png";
+            tilesId = id++;
+        } else {
+            tilesId = -1;
+        }
+        ImageOut.draw((x, y, painters) -> {
             final Hex.Coordinate coordinate = Hex.fromCartesian(x * scale, y * scale);
             final SHM.Coordinate shmCoord = shm.fromHex(coordinate);
             final RiverData data = layer.get(shmCoord);
-            if (!heightMap && data.outgoing() != null) {
-                final Hex.Coordinate outgoing = shm.toHex(SHMImpl.outerTruncate(shm.add(shmCoord, cache.offset(data.outgoing())), level));
-                final Hex.Coordinate center = shm.toHex(SHMImpl.outerTruncate(shmCoord, level));
+            final int effectiveLevel = data.level();
+            if (terrainId != -1 || tilesId != -1) {
+                final SHMImpl.CoordinateImpl centerSHM = SHMImpl.outerTruncate(shmCoord, effectiveLevel);
+                final Hex.Coordinate center = shm.toHex(centerSHM);
                 final double x0 = center.x();
                 final double y0 = center.y();
-
-                final double x1 = outgoing.x();
-                final double y1 = outgoing.y();
-                final double flowWidth = flowRemap(data.flowRate());
-                if (lineSegDist(x0, y0, x1, y1, x * scale, y * scale) < flowWidth / 255.0) {
-                    if (!Double.isFinite(data.flowRate())) {
-                        return 0xFF0000;
-                    }
-                    final int val = (int) (flowWidth);
-                    final int clamped = Math.max(Math.min(val, 255), 0);
-                    return (clamped) | (clamped << 8) | (clamped << 16);
-                }
-            }
-            if (!heightMap) {
-                final Hex.Coordinate center = shm.toHex(SHMImpl.outerTruncate(shmCoord, level));
-                final double x0 = center.x();
-                final double y0 = center.y();
-
-                for (final Hex.Direction direction : data.incoming().keySet()) {
-                    final SHM.Coordinate offset = shm.add(shmCoord, cache.offset(direction));
-                    final Hex.Coordinate incoming = shm.toHex(SHMImpl.outerTruncate(offset, level));
-                    final RiverData riverData = layer.get(offset);
-                    final double x1 = incoming.x();
-                    final double y1 = incoming.y();
-                    final double flowWidth = flowRemap(riverData.flowRate());
+                boolean terrainAccepted = terrainId == -1;
+                boolean tileAccepted = tilesId == -1;
+                if (data.outgoing() != null) {
+                    final SHM.Coordinate neighbourCoordinate = shm.add(shmCoord, SHM.shift(baseLevel.offset(data.outgoing()), effectiveLevel));
+                    final RiverData outgoingData = layer.get(neighbourCoordinate);
+                    final Hex.Coordinate neighbourCenterCoordinate = shm.toHex(SHM.outerTruncate(neighbourCoordinate, outgoingData.level()));
+                    final double x1 = neighbourCenterCoordinate.x();
+                    final double y1 = neighbourCenterCoordinate.y();
+                    final double flowWidth = flowRemap(data.flowRate());
                     if (lineSegDist(x0, y0, x1, y1, x * scale, y * scale) < flowWidth / 255.0) {
                         final int val = (int) (flowWidth);
                         final int clamped = Math.max(Math.min(val, 255), 0);
-                        return (clamped) | (clamped << 8) | (clamped << 16);
+                        final int color = (clamped) | (clamped << 8) | (clamped << 16);
+                        if (!terrainAccepted) {
+                            painters[terrainId].accept(color);
+                            terrainAccepted = true;
+                        }
+                        if (!tileAccepted) {
+                            painters[tilesId].accept(color);
+                            tileAccepted = true;
+                        }
                     }
                 }
+                for (final Hex.Direction direction : data.incoming().keySet()) {
+                    Hex.Direction offsetDir = direction;
+                    SHM.Coordinate offset = shm.add(centerSHM, SHM.shift(baseLevel.offset(offsetDir), effectiveLevel));
+                    RiverData neighbourData = layer.get(offset);
+                    final Hex.Coordinate incoming;
+                    offsetDir = offsetDir.opposite().rotateC();
+                    for (int i = effectiveLevel - 1; i >= neighbourData.level(); i--) {
+                        offset = shm.add(offset, SHM.shift(baseLevel.offset(offsetDir), i));
+                        neighbourData = layer.get(offset);
+                    }
+                    incoming = shm.toHex(SHMImpl.outerTruncate(offset, neighbourData.level()));
+                    final double x1 = incoming.x();
+                    final double y1 = incoming.y();
+                    final double flowWidth = flowRemap(neighbourData.flowRate());
+                    if (lineSegDist(x0, y0, x1, y1, x * scale, y * scale) < flowWidth / 255.0) {
+                        final int val = (int) (flowWidth);
+                        final int clamped = Math.max(Math.min(val, 255), 0);
+                        final int color = (clamped) | (clamped << 8) | (clamped << 16);
+                        if (!terrainAccepted) {
+                            painters[terrainId].accept(color);
+                            terrainAccepted = true;
+                        }
+                        if (!tileAccepted) {
+                            painters[tilesId].accept(color);
+                            tileAccepted = true;
+                        }
+                    }
+                }
+                if (!terrainAccepted) {
+                    painters[terrainId].accept(data.type() == PlateType.CONTINENT ? 0xFF00 : 0xFF);
+                }
+                if (!tileAccepted) {
+                    painters[tilesId].accept(SHM.outerHash(centerSHM, 0));
+                }
             }
-            if (heightMap) {
+            if (heightmapId != -1) {
                 if (data.type() == PlateType.CONTINENT) {
                     final double height = data.height();
-                    if (!Double.isFinite(height)) {
-                        return 0xFF0000;
-                    }
                     final int i = Math.min(Math.max((int) (height * 24), 0), 255);
-                    return i | (i << 8) | (i << 16);
+                    painters[heightmapId].accept(i | (i << 8) | (i << 16));
                 }
-                return 0xFF;
-            } else {
-                return data.type() == PlateType.CONTINENT ? 0xFF00 : 0xFF;
             }
-        }, 8192, 8192, filename);
+        }, 4096, 4096, files);
     }
 
     private static double flowRemap(final double x) {
-        if (x < 0.0001) {
+        if (x < 0.00075) {
             return 0;
         }
         return Math.pow(x, 1 / 3.0) * 255;
