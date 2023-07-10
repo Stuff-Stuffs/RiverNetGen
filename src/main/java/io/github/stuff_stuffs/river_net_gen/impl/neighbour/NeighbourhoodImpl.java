@@ -4,11 +4,13 @@ import io.github.stuff_stuffs.river_net_gen.api.neighbour.Neighbourhood;
 import io.github.stuff_stuffs.river_net_gen.api.util.Hex;
 import io.github.stuff_stuffs.river_net_gen.api.util.SHM;
 import io.github.stuff_stuffs.river_net_gen.impl.util.SHMImpl;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Function;
 
 public class NeighbourhoodImpl<T> implements Neighbourhood<T> {
     private static final int[] PACKED_ADDITION_TABLE;
+    private static final Hex.Direction[] FROM = new Hex.Direction[]{Hex.Direction.DOWN_RIGHT, Hex.Direction.DOWN, Hex.Direction.DOWN_LEFT, Hex.Direction.UP_LEFT, Hex.Direction.UP, Hex.Direction.UP_RIGHT};
 
     static {
         PACKED_ADDITION_TABLE = new int[7 * 7];
@@ -45,6 +47,14 @@ public class NeighbourhoodImpl<T> implements Neighbourhood<T> {
     @Override
     public T get(final int s) {
         return delegate.apply(toGlobalMut(s));
+    }
+
+    @Override
+    public Hex.@Nullable Direction from(final int s) {
+        if (s <= 0 | s > 7) {
+            return null;
+        }
+        return FROM[s - 1];
     }
 
     private SHM.Coordinate toGlobalMut(final int s) {

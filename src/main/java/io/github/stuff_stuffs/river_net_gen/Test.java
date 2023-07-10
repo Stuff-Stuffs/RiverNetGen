@@ -28,7 +28,7 @@ public class Test {
             final Layer.Basic<RiverData> zoom = RiverLayers.zoom(i, seed, layer);
             layer = zoom;
         }
-        final double scale = 1 / 6.0;
+        final double scale = 1 / 3.0;
         draw(scale, "triver", layer, true, true, true);
     }
 

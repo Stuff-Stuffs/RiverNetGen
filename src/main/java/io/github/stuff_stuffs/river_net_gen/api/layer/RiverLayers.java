@@ -3,27 +3,24 @@ package io.github.stuff_stuffs.river_net_gen.api.layer;
 import io.github.stuff_stuffs.river_net_gen.api.neighbour.Neighbourhood;
 import io.github.stuff_stuffs.river_net_gen.api.neighbour.NeighbourhoodFactory;
 import io.github.stuff_stuffs.river_net_gen.api.neighbour.base.NeighbourChooser;
+import io.github.stuff_stuffs.river_net_gen.api.neighbour.base.NeighbourWeightedWalker;
 import io.github.stuff_stuffs.river_net_gen.api.neighbour.base.NeighbourhoodPredicate;
 import io.github.stuff_stuffs.river_net_gen.api.neighbour.base.NeighbourhoodWalker;
 import io.github.stuff_stuffs.river_net_gen.api.util.Hex;
 import io.github.stuff_stuffs.river_net_gen.api.util.SHM;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
-import it.unimi.dsi.fastutil.Pair;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2ReferenceOpenCustomHashMap;
-import it.unimi.dsi.fastutil.objects.ObjectObjectImmutablePair;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.function.Function;
 
 public final class RiverLayers {
-    private static final double SQRT3_2 = Math.sqrt(3.0) / 4.0;
+    private static final double SQRT3_2 = Math.sqrt(3.0) / 3.0;
     private static final Hex.Direction[] DIRECTIONS = Hex.Direction.values();
     public static final NeighbourhoodPredicate<PlateType> ENCLAVE_DESTROYER = new NeighbourhoodPredicate<>(NeighbourhoodPredicate.Mode.OR, false) {
         @Override
@@ -47,6 +44,80 @@ public final class RiverLayers {
                 return 1;
             }
             return 0;
+        }
+    };
+    public static NeighbourWeightedWalker<PathResult, PathTree, Void, CachedExpandData> SPLIT_RIVERS = new NeighbourWeightedWalker<>() {
+        @Override
+        protected PathResult finish(final PathTree tree, final Neighbourhood<Void> neighbourhood, final CachedExpandData data, final int seed) {
+            final Node[] nodes = data.nodes;
+            for (int i = 0; i < 7; i++) {
+                nodes[i].depth = tree.depth[i];
+                if (tree.start == i) {
+                    nodes[i].outgoing = data.data.outgoing();
+                } else {
+                    final Hex.Direction direction = tree.outgoing[i];
+                    nodes[i].outgoing = tree.outgoing[i];
+                    nodes[neighbourhood.offset(i, direction)].incoming.put(direction.opposite(), tree.children[i]);
+                }
+                final Hex.Direction edge = neighbourhood.from(i);
+                if (edge != null) {
+                    final RiverData.Incoming incoming = data.data.incoming().get(edge.rotateCC());
+                    if (incoming != null) {
+                        nodes[i].incoming.put(edge.rotateCC(), incoming.tiles() * 7);
+                    }
+                }
+            }
+            return new PathResult(nodes);
+        }
+
+        @Override
+        protected PathTree connect(int from, final int to, final Hex.Direction outgoing, final PathTree partialResult, final Neighbourhood<Void> neighbourhood, final CachedExpandData data, final int seed) {
+            partialResult.depth[to] = partialResult.depth[from] + 1;
+            partialResult.outgoing[to] = outgoing;
+            while (partialResult.outgoing[from] != null) {
+                partialResult.children[from] += 1;
+                from = neighbourhood.offset(from, partialResult.outgoing[from]);
+            }
+            partialResult.children[from] += 1;
+            return partialResult;
+        }
+
+        @Override
+        protected PathTree init(final int start, final Neighbourhood<Void> neighbourhood, final CachedExpandData data, final int seed) {
+            return new PathTree(start);
+        }
+
+        @Override
+        protected int start(final Neighbourhood<Void> neighbourhood, final CachedExpandData data, final int seed) {
+            return neighbourhood.offset(neighbourhood.center(), data.data.outgoing().rotateC());
+        }
+
+        @Override
+        protected double weight(final int from, final int to, final Hex.Direction fromDirection, final PathTree tree, final Neighbourhood<Void> neighbourhood, final CachedExpandData data, final int seed) {
+            final Hex.Direction edge = neighbourhood.from(to);
+            double weight = 1;
+            if (edge != null) {
+                final RiverData.Incoming incoming = data.data.incoming().get(edge.opposite());
+                if (incoming != null) {
+                    weight = weight + weightAngle(fromDirection, edge);
+                }
+            }
+            if (from != tree.start) {
+                weight = weight + weightAngle(tree.outgoing[from], fromDirection.opposite());
+            } else {
+                weight = weight + weightAngle(data.data.outgoing(), fromDirection.opposite());
+            }
+            return weight + 7  * randomDoubleFromLong(HashCommon.mix(HashCommon.mix(seed -123456789L) ^ HashCommon.mix(from * 63 + 1) ^ HashCommon.mix(to * 127 + 3)));
+        }
+
+        private double weightAngle(final Hex.Direction outgoing, final Hex.Direction incoming) {
+            if (outgoing == incoming.rotateC() || outgoing == incoming.rotateCC()) {
+                return 1;
+            }
+            if (outgoing == incoming.opposite()) {
+                return 100;
+            }
+            return 7;
         }
     };
     public static final NeighbourhoodWalker<WalkerNode, WalkerNode, RiverLayers.Node, RiverData> FILL_DATA = new NeighbourhoodWalker<>(WalkerNode.class, WalkerNode.class) {
@@ -168,7 +239,7 @@ public final class RiverLayers {
             final WalkerNode parent = states[offset];
             if (parent != null) {
                 final double overFlow = parent.flowRate - parent.requiredFlowRate;
-                node.flowRate = node.requiredFlowRate + overFlow * (node.tiles / (double) (parent.tiles));
+                node.flowRate = node.requiredFlowRate + overFlow * (node.tiles / (double) (parent.tiles + 1));
                 return node;
             }
             return null;
@@ -229,6 +300,10 @@ public final class RiverLayers {
             final Hex.@Nullable Direction chosen = outgoingBase(coordinate, factory.build(coordinate, prev), seed, cache);
             return new RiverData(PlateType.CONTINENT, Collections.emptyMap(), chosen, 1, flowBase(coordinate, seed, outer), 1, level);
         });
+    }
+
+    private static double randomDoubleFromLong(long state) {
+        return (state >>> 11) * 0x1.0p-53;
     }
 
     private static double flowBase(final SHM.Coordinate coordinate, final int seed, final Hash.Strategy<SHM.Coordinate> strategy) {
@@ -361,100 +436,8 @@ public final class RiverLayers {
         }
         cachedExpandData.reset();
         final SHM.Coordinate truncated = SHM.outerTruncate(coordinate, level + 1);
-        final SHM.Coordinate start = shm.add(truncated, cache.offset(parentData.outgoing().rotateC()));
-        final Map<SHM.Coordinate, Pair<Hex.Direction, RiverData.Incoming>> incomingPoints = new Object2ReferenceOpenCustomHashMap<>(cache.outer());
-        for (final Map.Entry<Hex.Direction, RiverData.Incoming> entry : parentData.incoming().entrySet()) {
-            final SHM.Coordinate offset = shm.add(truncated, cache.offset(entry.getKey().rotateC()));
-            incomingPoints.put(offset, new ObjectObjectImmutablePair<>(entry.getKey(), entry.getValue()));
-        }
-        final byte b = start.get(level);
-        final double[] weights = cachedExpandData.weights;
-        final SHM.Coordinate[] incoming = cachedExpandData.incoming;
-        final Hex.Direction[] incomingDirections = cachedExpandData.incomingDirections;
-        final Node[] nodes = cachedExpandData.nodes;
-        weights[b] = Double.NEGATIVE_INFINITY;
-        incoming[b] = shm.add(start, cache.offset(parentData.outgoing()));
-        nodes[b].outgoing = parentData.outgoing();
-        nodes[b].depth = 0;
-        incomingDirections[b] = parentData.outgoing();
-        long state = seed ^ cache.outer().hashCode(start);
-        final int[] shuffle = new int[7];
-        for (int i = 0; i < 7; i++) {
-            shuffle[i] = i;
-        }
-        shuffle(shuffle, state);
-        final Hex.Direction[] shuffledDirections = Arrays.copyOf(DIRECTIONS, DIRECTIONS.length);
-        shuffle(shuffledDirections, HashCommon.mix(state ^ 0xFFFF_0007));
-        for (final Hex.Direction direction : shuffledDirections) {
-            shm.addMutable(start, cache.offset(direction), scratch0);
-            if (!outerCache.outer().equals(start, scratch0)) {
-                continue;
-            }
-            final byte index = scratch0.get(level);
-            final Hex.@Nullable Direction incomingIncoming;
-            if (incomingPoints.containsKey(scratch0)) {
-                incomingIncoming = incomingPoints.get(scratch0).first();
-            } else {
-                incomingIncoming = null;
-            }
-            final double v = weight(parentData.outgoing(), direction, incomingIncoming);
-            weights[index] = v;
-            incoming[index] = start;
-            incomingDirections[index] = direction.opposite();
-        }
-
-        for (int i = 1; i < 7; i++) {
-            double min = Double.POSITIVE_INFINITY;
-            int minIndex = -1;
-            for (int j = 0; j < 7; j++) {
-                final int index = shuffle[j];
-                if (nodes[index].outgoing == null) {
-                    final double weight = weights[index];
-                    if (weight < min) {
-                        min = weights[index];
-                        minIndex = index;
-                    }
-                }
-            }
-            final SHM.Coordinate incomingCell = incoming[minIndex];
-            nodes[incomingCell.get(level)].incoming.put(incomingDirections[minIndex].opposite(), -1);
-            nodes[minIndex].outgoing = incomingDirections[minIndex];
-            nodes[minIndex].depth = nodes[incomingCell.get(level)].depth + 1;
-            shm.addMutable(incomingCell, cache.offset(incomingDirections[minIndex].opposite()), scratch0);
-            if (incomingPoints.containsKey(scratch0)) {
-                final Pair<Hex.Direction, RiverData.Incoming> pair = incomingPoints.get(scratch0);
-                nodes[minIndex].incoming.put(pair.first(), pair.second().tiles());
-            }
-            if (nodes[minIndex].depth == 3) {
-                continue;
-            }
-            for (int j = 0; j < DIRECTIONS.length; j++) {
-                final Hex.Direction direction = shuffledDirections[j];
-                shm.addMutable(scratch0, cache.offset(direction), scratch1);
-                if (!outerCache.outer().equals(start, scratch1)) {
-                    continue;
-                }
-                final byte index = scratch1.get(level);
-                final Hex.@Nullable Direction incomingIncoming;
-                if (incomingPoints.containsKey(scratch1)) {
-                    incomingIncoming = incomingPoints.get(scratch1).first();
-                } else {
-                    incomingIncoming = null;
-                }
-                final double v = weight(parentData.outgoing(), direction, incomingIncoming) + min;
-                final double weight = weights[index];
-                if (v < weight || Double.isNaN(weights[index])) {
-                    weights[index] = v;
-                    incoming[index] = scratch0.toImmutable();
-                    incomingDirections[index] = direction.opposite();
-                } else if (v == weight && (state & 1) == 0) {
-                    state = HashCommon.mix(state + 123456) ^ HashCommon.mix(state - 123456);
-                    incoming[index] = scratch0.toImmutable();
-                    incomingDirections[index] = direction.opposite();
-                }
-            }
-        }
-        cachedExpandData.nodeGetter.nodes = nodes;
+        cachedExpandData.data = parentData;
+        cachedExpandData.nodeGetter.nodes = SPLIT_RIVERS.walk(factory.build(truncated, i -> null), cachedExpandData, seed ^ SHM.outerHash(truncated, level)).nodes;
         final NeighbourhoodWalker.Result<WalkerNode> walk = FILL_DATA.walk(factory.build(truncated, cachedExpandData.nodeGetter), parentData);
         cachedExpandData.walkerNodeGetter.nodes = walk.raw();
         final NeighbourhoodWalker.Result<RiverData> flowWalk = FLOW_FILL.walk(factory.build(truncated, cachedExpandData.walkerNodeGetter), parentData);
@@ -493,45 +476,6 @@ public final class RiverLayers {
         return height + (endHeight - height) * (depth / (maxDepth + 1.0D));
     }
 
-    private static <T> void shuffle(final T[] arr, long seed) {
-        for (int i = 0; i < arr.length; i++) {
-            final int idx = (((int) seed) & 0x7FFF_FFFF) % arr.length;
-            seed = HashCommon.mix(seed + 12345678) ^ HashCommon.mix(seed - 12345678);
-            final T cur = arr[i];
-            arr[i] = arr[idx];
-            arr[idx] = cur;
-        }
-    }
-
-    private static void shuffle(final int[] arr, long seed) {
-        for (int i = 0; i < arr.length; i++) {
-            final int idx = (((int) seed) & 0x7FFF_FFFF) % arr.length;
-            seed = HashCommon.mix(seed + 12345678) ^ HashCommon.mix(seed - 12345678);
-            final int cur = arr[i];
-            arr[i] = arr[idx];
-            arr[idx] = cur;
-        }
-    }
-
-    private static double weight(final Hex.Direction outgoing, final Hex.Direction incoming, final Hex.@Nullable Direction incomingIncoming) {
-        if (incomingIncoming == null) {
-            return weight(outgoing, incoming);
-        } else {
-            return weight(outgoing, incoming) + weight(incoming.opposite(), incomingIncoming);
-        }
-    }
-
-    private static double weight(final Hex.Direction outgoing, final Hex.Direction incoming) {
-        if (outgoing.opposite() == incoming) {
-            return -5;
-        }
-        if (outgoing.rotateC() == incoming || outgoing.rotateCC() == incoming) {
-            return 5;
-        }
-        return -1;
-    }
-
-
     private static Hex.@Nullable Direction outgoingBase(final SHM.Coordinate coordinate, final Neighbourhood<PlateType> neighbourhood, final int seed, final SHM.LevelCache cache) {
         return OUTGOING_BASE.choose(neighbourhood, seed + cache.outer().hashCode(coordinate));
     }
@@ -564,16 +508,36 @@ public final class RiverLayers {
         }
     }
 
+    private static final class PathTree {
+        private final int start;
+        private final Hex.Direction[] outgoing;
+        private final int[] depth;
+        private final long[] children;
+
+        private PathTree(final int start) {
+            this.start = start;
+            outgoing = new Hex.Direction[7];
+            depth = new int[7];
+            children = new long[7];
+        }
+    }
+
+    private static final class PathResult {
+        private final Node[] nodes;
+
+        private PathResult(final Node[] nodes) {
+            this.nodes = nodes;
+        }
+    }
+
     private static final class CachedExpandData {
-        private final double[] weights = new double[]{Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN};
-        private final SHM.Coordinate[] incoming = new SHM.Coordinate[7];
-        private final Hex.Direction[] incomingDirections = new Hex.Direction[7];
         private final Node[] nodes = new Node[7];
         private final NodeGetter nodeGetter;
         private final WalkerNodeGetter walkerNodeGetter;
         private final SHM.MutableCoordinate scratch0;
         private final SHM.MutableCoordinate scratch1;
         private final double maxFlowRate;
+        private RiverData data;
 
         public CachedExpandData(final int level) {
             for (int i = 0; i < 7; i++) {
@@ -587,9 +551,6 @@ public final class RiverLayers {
         }
 
         public void reset() {
-            Arrays.fill(weights, Double.NaN);
-            Arrays.fill(incoming, null);
-            Arrays.fill(incomingDirections, null);
             for (final Node node : nodes) {
                 node.outgoing = null;
                 node.incoming.clear();

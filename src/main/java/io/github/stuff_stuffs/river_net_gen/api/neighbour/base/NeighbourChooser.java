@@ -7,17 +7,12 @@ import org.jetbrains.annotations.Nullable;
 
 public abstract class NeighbourChooser<T> {
     private static final Hex.Direction[] DIRECTIONS = Hex.Direction.values();
-    private final Hex.Direction[] neighbours;
-    private final double[] weights;
-
-    protected NeighbourChooser() {
-        neighbours = new Hex.Direction[6];
-        weights = new double[6];
-    }
 
     protected abstract double weight(T val, T center, Hex.Direction direction, Neighbourhood<T> neighbourhood, long seed);
 
     public Hex.@Nullable Direction choose(final Neighbourhood<T> neighbourhood, final long seed) {
+        Hex.Direction[] neighbours = new Hex.Direction[6];
+        double[] weights = new double[6];
         final int center = neighbourhood.center();
         final T centerVal = neighbourhood.get(center);
         int count = 0;

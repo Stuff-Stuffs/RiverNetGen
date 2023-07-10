@@ -64,6 +64,6 @@ public final class ImageOut {
     }
 
     public interface Drawer {
-        void draw(int x, int y, IntConsumer[] consumers);
+        void draw(int x, int y, IntConsumer[] painters);
     }
 }
