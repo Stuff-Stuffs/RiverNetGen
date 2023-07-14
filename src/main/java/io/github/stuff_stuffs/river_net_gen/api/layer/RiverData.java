@@ -6,7 +6,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Map;
 
 public record RiverData(PlateType type, Map<Hex.Direction, Incoming> incoming, @Nullable Hex.Direction outgoing,
-                        double height, double flowRate, long tiles, int level) {
+                        double height, double flowRate, double tiles, int level, double rainfall) {
     public RiverData {
         if (outgoing != null && incoming.containsKey(outgoing)) {
             throw new IllegalArgumentException();
@@ -28,6 +28,6 @@ public record RiverData(PlateType type, Map<Hex.Direction, Incoming> incoming, @
         }
     }
 
-    public record Incoming(double height, long tiles, double flowRate) {
+    public record Incoming(double height, double tiles, double flowRate) {
     }
 }

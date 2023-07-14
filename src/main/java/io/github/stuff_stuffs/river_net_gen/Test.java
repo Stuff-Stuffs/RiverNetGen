@@ -28,14 +28,14 @@ public class Test {
             final Layer.Basic<RiverData> zoom = RiverLayers.zoom(i, seed, layer);
             layer = zoom;
         }
-        final double scale = 1 / 4.0;
-        draw(scale, "triver", layer, true, true, true);
+        final double scale = 1 / 6.0;
+        draw(scale, "triver", layer, true, true, true, true);
     }
 
-    private static void draw(final double scale, final String prefix, final Layer<RiverData> layer, final boolean terrain, final boolean heightMap, final boolean tiles) {
+    private static void draw(final double scale, final String prefix, final Layer<RiverData> layer, final boolean terrain, final boolean heightMap, final boolean tiles, final boolean humidity) {
         final SHM shm = SHM.create();
         final SHM.LevelCache baseLevel = SHM.createCache(0);
-        final int count = (terrain ? 1 : 0) + (heightMap ? 1 : 0) + (tiles ? 1 : 0);
+        final int count = (terrain ? 1 : 0) + (heightMap ? 1 : 0) + (tiles ? 1 : 0) + (humidity ? 1 : 0);
         final String[] files = new String[count];
         int id = 0;
         final int terrainId;
@@ -58,6 +58,13 @@ public class Test {
             tilesId = id++;
         } else {
             tilesId = -1;
+        }
+        final int humidityId;
+        if (humidity) {
+            files[id] = prefix + "Humidity.png";
+            humidityId = id++;
+        } else {
+            humidityId = -1;
         }
         ImageOut.draw((x, y, painters) -> {
             final Hex.Coordinate coordinate = Hex.fromCartesian(x * scale, y * scale);
@@ -134,7 +141,14 @@ public class Test {
                     painters[heightmapId].accept(i | (i << 8) | (i << 16));
                 }
             }
-        }, 4096, 4096, files);
+            if (humidityId != -1) {
+                if (data.type() == PlateType.CONTINENT) {
+                    final double h = data.rainfall();
+                    final int i = Math.min(Math.max((int) (h * 24), 0), 255);
+                    painters[humidityId].accept(i | (i << 8) | (i << 16));
+                }
+            }
+        }, 8192, 8192, files);
     }
 
     private static double flowRemap(final double x) {
