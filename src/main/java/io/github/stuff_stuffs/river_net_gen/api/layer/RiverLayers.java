@@ -127,7 +127,7 @@ public final class RiverLayers {
             if (node.incoming.isEmpty()) {
                 final WalkerNode walkerNode = new WalkerNode(context.height() + 1, node.depth, context.height() + 1, node.outgoing);
                 final int hash = SHM.outerHash(neighbourhood.toGlobal(s), 0);
-                walkerNode.tiles = randomDoubleFromLong(HashCommon.murmurHash3(hash | (long) hash << 32)) * 4 * context.rainfall()  + 1;
+                walkerNode.tiles = randomDoubleFromLong(HashCommon.murmurHash3(hash | (long) hash << 32)) * 2 * context.rainfall()  + 1;
                 walkerNode.requiredFlowRate = 0;
                 return walkerNode;
             }
