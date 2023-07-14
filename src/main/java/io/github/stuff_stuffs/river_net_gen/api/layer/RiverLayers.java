@@ -99,7 +99,7 @@ public final class RiverLayers {
             if (edge != null) {
                 final RiverData.Incoming incoming = data.data.incoming().get(edge.opposite());
                 if (incoming != null) {
-                    weight = weight + weightAngle(fromDirection, edge);
+                    weight = weight + weightAngle(fromDirection, edge.opposite());
                 }
             }
             if (from != tree.start) {
@@ -107,7 +107,7 @@ public final class RiverLayers {
             } else {
                 weight = weight + weightAngle(data.data.outgoing(), fromDirection.opposite());
             }
-            return weight + 7  * randomDoubleFromLong(HashCommon.mix(HashCommon.mix(seed -123456789L) ^ HashCommon.mix(from * 63 + 1) ^ HashCommon.mix(to * 127 + 3)));
+            return weight + 70  * randomDoubleFromLong(HashCommon.mix(data.splitSeed ^ HashCommon.mix(seed -123456789L) ^ HashCommon.mix(from * 63 + 1) ^ HashCommon.mix(to * 127 + 3)));
         }
 
         private double weightAngle(final Hex.Direction outgoing, final Hex.Direction incoming) {
@@ -117,7 +117,7 @@ public final class RiverLayers {
             if (outgoing == incoming.opposite()) {
                 return 100;
             }
-            return 7;
+            return 50;
         }
     };
     public static final NeighbourhoodWalker<WalkerNode, WalkerNode, RiverLayers.Node, RiverData> FILL_DATA = new NeighbourhoodWalker<>(WalkerNode.class, WalkerNode.class) {
@@ -310,7 +310,7 @@ public final class RiverLayers {
         final int hashCode = strategy.hashCode(coordinate);
         final int start = HashCommon.mix(seed ^ hashCode) ^ HashCommon.murmurHash3(hashCode);
         final long data = HashCommon.murmurHash3(HashCommon.mix((long) start | (((long) start) << 32L)) + 123456);
-        return 14;// (data >>> 11) * 0x1.0p-53;
+        return 7 + 7 * (data >>> 11) * 0x1.0p-53;
     }
 
     public static Layer.Basic<RiverData> grow(final int seed, final int level, final Layer<RiverData> prev) {
@@ -410,7 +410,6 @@ public final class RiverLayers {
 
     private static SubRiverData zoomInternal(final SHM.Coordinate coordinate, final RiverData parentData, final int level, final SHM shm, final SHM.LevelCache cache, final SHM.LevelCache outerCache, final int seed, final NeighbourhoodFactory factory, final CachedExpandData cachedExpandData) {
         final SHM.MutableCoordinate scratch0 = cachedExpandData.scratch0;
-        final SHM.MutableCoordinate scratch1 = cachedExpandData.scratch1;
         if (parentData.type() == PlateType.OCEAN) {
             if (parentData.incoming().isEmpty() || (parentData.flowRate() - cachedExpandData.maxFlowRate) > 0) {
                 return new SubRiverData(new RiverData[]{parentData, parentData, parentData, parentData, parentData, parentData, parentData});
@@ -436,8 +435,10 @@ public final class RiverLayers {
         }
         cachedExpandData.reset();
         final SHM.Coordinate truncated = SHM.outerTruncate(coordinate, level + 1);
+        final int outerHash = SHM.outerHash(truncated, level+1);
+        cachedExpandData.splitSeed = HashCommon.mix(outerHash + 4321);
         cachedExpandData.data = parentData;
-        cachedExpandData.nodeGetter.nodes = SPLIT_RIVERS.walk(factory.build(truncated, i -> null), cachedExpandData, seed ^ SHM.outerHash(truncated, level)).nodes;
+        cachedExpandData.nodeGetter.nodes = SPLIT_RIVERS.walk(factory.build(truncated, i -> null), cachedExpandData, seed ^ outerHash).nodes;
         final NeighbourhoodWalker.Result<WalkerNode> walk = FILL_DATA.walk(factory.build(truncated, cachedExpandData.nodeGetter), parentData);
         cachedExpandData.walkerNodeGetter.nodes = walk.raw();
         final NeighbourhoodWalker.Result<RiverData> flowWalk = FLOW_FILL.walk(factory.build(truncated, cachedExpandData.walkerNodeGetter), parentData);
@@ -535,8 +536,8 @@ public final class RiverLayers {
         private final NodeGetter nodeGetter;
         private final WalkerNodeGetter walkerNodeGetter;
         private final SHM.MutableCoordinate scratch0;
-        private final SHM.MutableCoordinate scratch1;
         private final double maxFlowRate;
+        private int splitSeed;
         private RiverData data;
 
         public CachedExpandData(final int level) {
@@ -546,7 +547,6 @@ public final class RiverLayers {
             nodeGetter = new NodeGetter(level);
             walkerNodeGetter = new WalkerNodeGetter(level);
             scratch0 = SHM.createMutable();
-            scratch1 = SHM.createMutable();
             maxFlowRate = Math.pow(SQRT3_2 * Math.pow(2.6457513, level), 3);
         }
 

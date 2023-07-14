@@ -14,7 +14,7 @@ public class Test {
 
     public static void main(final String[] args) {
         final int seed = 777431342;
-        final int layerCount = 5;
+        final int layerCount = 6;
         final Layer.Basic<PlateType> base = RiverLayers.enclaveDestructor(layerCount + 1, RiverLayers.base(seed, layerCount + 1));
         Layer.Basic<RiverData> riverBase = RiverLayers.riverBase(seed, layerCount, base);
         for (int i = 0; i < 2; i++) {
@@ -28,7 +28,7 @@ public class Test {
             final Layer.Basic<RiverData> zoom = RiverLayers.zoom(i, seed, layer);
             layer = zoom;
         }
-        final double scale = 1 / 3.0;
+        final double scale = 1 / 4.0;
         draw(scale, "triver", layer, true, true, true);
     }
 

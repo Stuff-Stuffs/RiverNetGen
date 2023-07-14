@@ -49,7 +49,7 @@ public abstract class NeighbourWeightedWalker<Result, PartialResult, Input, Cont
                         continue;
                     }
                     final double weight = selectedWeight + weight(selected, n, direction, partialResult, neighbourhood, context, seed);
-                    if (!(weights[n] < weight)) {
+                    if (Double.isNaN(weights[n]) | weight < weights[n]) {
                         weights[n] = weight;
                         prev[n] = direction.opposite();
                     }
