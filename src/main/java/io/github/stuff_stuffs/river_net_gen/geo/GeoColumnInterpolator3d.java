@@ -70,13 +70,13 @@ public class GeoColumnInterpolator3d<T> {
         }
     }
 
-    private static void fill(final ColumnCoordinate firstCoord, final GeoColumn<?> first, final ColumnCoordinate secondCoord, final GeoColumn<?> second, final ColumnCoordinate thirdCoord, final GeoColumn<?> third, final int fStart, final int sStart, final int tStart, final int fEnd, final int sEnd, final int tEnd, final Vec3d lastNormal, @Nullable final Vec3d nextNormal, List<Vec3d> normals, List<Vec3d> vertices, List<Object> data) {
+    private static void fill(final ColumnCoordinate firstCoord, final GeoColumn<?> first, final ColumnCoordinate secondCoord, final GeoColumn<?> second, final ColumnCoordinate thirdCoord, final GeoColumn<?> third, final int fStart, final int sStart, final int tStart, final int fEnd, final int sEnd, final int tEnd, final Vec3d lastNormal, @Nullable final Vec3d nextNormal, final List<Vec3d> normals, final List<Vec3d> vertices, final List<Object> data) {
         final int fDiff = fEnd - fStart;
         final int sDiff = sEnd - sStart;
         final int tDiff = tEnd - tStart;
-        final int fCount = 0;
-        final int sCount = 0;
-        final int tCount = 0;
+        int fCount = 0;
+        int sCount = 0;
+        int tCount = 0;
         while (fCount < fDiff || sCount < sDiff || tCount < tDiff) {
             final int chosen;
             if (fCount == fDiff) {
@@ -88,28 +88,68 @@ public class GeoColumnInterpolator3d<T> {
                     chosen = second.height(sCount + sStart) <= third.height(tCount + tStart) ? 1 : 2;
                 }
             } else if (sCount == sDiff) {
-                if (fCount == fDiff) {
-                    chosen = 2;
-                } else if (tCount == tDiff) {
+                if (tCount == tDiff) {
                     chosen = 0;
                 } else {
                     chosen = first.height(fCount + fStart) <= third.height(tCount + tStart) ? 0 : 2;
                 }
             } else if (tCount == tDiff) {
-                if (fCount == fDiff) {
-                    chosen = 1;
-                } else if(sCount==sDiff) {
-                    chosen = 0;
-                } else {
-                    chosen = first.height(fCount + fStart) <= second.height(sCount + sStart) ? 0 : 1;
-                }
+                chosen = first.height(fCount + fStart) <= second.height(sCount + sStart) ? 0 : 1;
             } else {
-                int fHeight = first.height(fStart + fCount);
-                int fHeight = first.height(fStart + fCount);
-                int fHeight = first.height(fStart + fCount);
+                final int fHeight = first.height(fStart + fCount);
+                final int sHeight = first.height(sStart + sCount);
+                final int tHeight = first.height(tStart + tCount);
+                if (fHeight <= sHeight) {
+                    if (fHeight <= tHeight) {
+                        chosen = 0;
+                    } else {
+                        chosen = 2;
+                    }
+                } else if (sHeight <= tHeight) {
+                    chosen = 1;
+                } else {
+                    chosen = 2;
+                }
             }
-            if(chosen==0) {
-                Vec3d vertex =
+            if (chosen == 0) {
+                final Vec3d vertex = new Vec3d(firstCoord.x, first.height(fStart + fCount), firstCoord.z);
+                Vec3d normal;
+                if (nextNormal == null) {
+                    normal = lastNormal;
+                } else {
+                    double alpha = (fCount + 1) / (double) (fDiff + 1);
+                    normal = slerp(lastNormal, nextNormal, alpha);
+                }
+                vertices.add(vertex);
+                normals.add(normal);
+                data.add(first.data(fStart+fCount));
+                fCount++;
+            } else if(chosen==1) {
+                final Vec3d vertex = new Vec3d(secondCoord.x, second.height(sStart + sCount), secondCoord.z);
+                Vec3d normal;
+                if (nextNormal == null) {
+                    normal = lastNormal;
+                } else {
+                    double alpha = (sCount + 1) / (double) (sDiff + 1);
+                    normal = slerp(lastNormal, nextNormal, alpha);
+                }
+                vertices.add(vertex);
+                normals.add(normal);
+                data.add(second.data(sStart+sCount));
+                sCount++;
+            } else {
+                final Vec3d vertex = new Vec3d(thirdCoord.x, third.height(tStart + tCount), thirdCoord.z);
+                Vec3d normal;
+                if (nextNormal == null) {
+                    normal = lastNormal;
+                } else {
+                    double alpha = (tCount + 1) / (double) (tDiff + 1);
+                    normal = slerp(lastNormal, nextNormal, alpha);
+                }
+                vertices.add(vertex);
+                normals.add(normal);
+                data.add(third.data(tStart+tCount));
+                sCount++;
             }
         }
     }
