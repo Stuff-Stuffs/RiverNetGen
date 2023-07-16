@@ -1,9 +1,9 @@
-package io.github.stuff_stuffs.river_net_gen.impl.neighbour;
+package io.github.stuff_stuffs.river_net_gen.river.impl.neighbour;
 
-import io.github.stuff_stuffs.river_net_gen.api.neighbour.Neighbourhood;
-import io.github.stuff_stuffs.river_net_gen.api.neighbour.NeighbourhoodFactory;
-import io.github.stuff_stuffs.river_net_gen.api.util.SHM;
-import io.github.stuff_stuffs.river_net_gen.impl.util.SHMImpl;
+import io.github.stuff_stuffs.river_net_gen.river.neighbour.Neighbourhood;
+import io.github.stuff_stuffs.river_net_gen.river.neighbour.NeighbourhoodFactory;
+import io.github.stuff_stuffs.river_net_gen.util.SHM;
+import io.github.stuff_stuffs.river_net_gen.river.impl.util.SHMImpl;
 
 import java.util.function.Function;
 

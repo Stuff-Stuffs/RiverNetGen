@@ -1,20 +1,20 @@
 package io.github.stuff_stuffs.river_net_gen;
 
-import io.github.stuff_stuffs.river_net_gen.api.layer.Layer;
-import io.github.stuff_stuffs.river_net_gen.api.layer.PlateType;
-import io.github.stuff_stuffs.river_net_gen.api.layer.RiverData;
-import io.github.stuff_stuffs.river_net_gen.api.layer.RiverLayers;
-import io.github.stuff_stuffs.river_net_gen.api.util.Hex;
-import io.github.stuff_stuffs.river_net_gen.api.util.ImageOut;
-import io.github.stuff_stuffs.river_net_gen.api.util.SHM;
-import io.github.stuff_stuffs.river_net_gen.impl.util.SHMImpl;
+import io.github.stuff_stuffs.river_net_gen.river.layer.Layer;
+import io.github.stuff_stuffs.river_net_gen.river.layer.PlateType;
+import io.github.stuff_stuffs.river_net_gen.river.layer.RiverData;
+import io.github.stuff_stuffs.river_net_gen.river.layer.RiverLayers;
+import io.github.stuff_stuffs.river_net_gen.util.Hex;
+import io.github.stuff_stuffs.river_net_gen.util.ImageOut;
+import io.github.stuff_stuffs.river_net_gen.util.SHM;
+import io.github.stuff_stuffs.river_net_gen.river.impl.util.SHMImpl;
 
 public class Test {
 
 
     public static void main(final String[] args) {
         final int seed = 777431342;
-        final int layerCount = 6;
+        final int layerCount = 5;
         final Layer.Basic<PlateType> base = RiverLayers.enclaveDestructor(layerCount + 1, RiverLayers.base(seed, layerCount + 1));
         Layer.Basic<RiverData> riverBase = RiverLayers.riverBase(seed, layerCount, base);
         for (int i = 0; i < 2; i++) {

@@ -1,7 +1,7 @@
-package io.github.stuff_stuffs.river_net_gen.impl.util;
+package io.github.stuff_stuffs.river_net_gen.river.impl.util;
 
-import io.github.stuff_stuffs.river_net_gen.api.util.Hex;
-import io.github.stuff_stuffs.river_net_gen.api.util.SHM;
+import io.github.stuff_stuffs.river_net_gen.util.Hex;
+import io.github.stuff_stuffs.river_net_gen.util.SHM;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 
@@ -146,7 +146,7 @@ public final class SHMImpl implements SHM {
                 final byte carryByte = ADDITION_TABLE[((int) (buffer1 >>> (3 * j)) & 0x7) * 7 + carry];
                 b = (byte) (carryByte & 7);
                 final long mask = ~((long) 0b111 << 3 * (j));
-                buffer1 = (buffer1 & mask) | ((long)b << 3 * j);
+                buffer1 = (buffer1 & mask) | ((long) b << 3 * j);
                 if (b != 0) {
                     len = Math.min(Math.max(len, j + 1), MAX_LEVEL);
                 }
@@ -155,6 +155,14 @@ public final class SHMImpl implements SHM {
             }
         }
         return res;
+    }
+
+    @Override
+    public int offsetPartial(final Coordinate coordinate, final int level, final Hex.Direction direction) {
+        final int f = coordinate.get(level);
+        final int s = idFromDirection(direction);
+        final byte sum = ADDITION_TABLE[f * 7 + s];
+        return sum & 0x7;
     }
 
     @Override

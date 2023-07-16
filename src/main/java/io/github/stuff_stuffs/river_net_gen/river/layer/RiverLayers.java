@@ -1,13 +1,13 @@
-package io.github.stuff_stuffs.river_net_gen.api.layer;
+package io.github.stuff_stuffs.river_net_gen.river.layer;
 
-import io.github.stuff_stuffs.river_net_gen.api.neighbour.Neighbourhood;
-import io.github.stuff_stuffs.river_net_gen.api.neighbour.NeighbourhoodFactory;
-import io.github.stuff_stuffs.river_net_gen.api.neighbour.base.NeighbourChooser;
-import io.github.stuff_stuffs.river_net_gen.api.neighbour.base.NeighbourWeightedWalker;
-import io.github.stuff_stuffs.river_net_gen.api.neighbour.base.NeighbourhoodPredicate;
-import io.github.stuff_stuffs.river_net_gen.api.neighbour.base.NeighbourhoodWalker;
-import io.github.stuff_stuffs.river_net_gen.api.util.Hex;
-import io.github.stuff_stuffs.river_net_gen.api.util.SHM;
+import io.github.stuff_stuffs.river_net_gen.river.neighbour.Neighbourhood;
+import io.github.stuff_stuffs.river_net_gen.river.neighbour.NeighbourhoodFactory;
+import io.github.stuff_stuffs.river_net_gen.river.neighbour.base.NeighbourChooser;
+import io.github.stuff_stuffs.river_net_gen.river.neighbour.base.NeighbourWeightedWalker;
+import io.github.stuff_stuffs.river_net_gen.river.neighbour.base.NeighbourhoodPredicate;
+import io.github.stuff_stuffs.river_net_gen.river.neighbour.base.NeighbourhoodWalker;
+import io.github.stuff_stuffs.river_net_gen.util.Hex;
+import io.github.stuff_stuffs.river_net_gen.util.SHM;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
@@ -107,7 +107,7 @@ public final class RiverLayers {
             } else {
                 weight = weight + weightAngle(data.data.outgoing(), fromDirection.opposite());
             }
-            return weight + 70  * randomDoubleFromLong(HashCommon.mix(data.splitSeed ^ HashCommon.mix(seed -123456789L) ^ HashCommon.mix(from * 63 + 1) ^ HashCommon.mix(to * 127 + 3)));
+            return weight + 70 * randomDoubleFromLong(HashCommon.mix(data.splitSeed ^ HashCommon.mix(seed - 123456789L) ^ HashCommon.mix(from * 63 + 1) ^ HashCommon.mix(to * 127 + 3)));
         }
 
         private double weightAngle(final Hex.Direction outgoing, final Hex.Direction incoming) {
@@ -120,14 +120,14 @@ public final class RiverLayers {
             return 50;
         }
     };
-    public static final NeighbourhoodWalker<WalkerNode, WalkerNode, RiverLayers.Node, RiverData> FILL_DATA = new NeighbourhoodWalker<>(WalkerNode.class, WalkerNode.class) {
+    public static final NeighbourhoodWalker<WalkerNode, WalkerNode, Node, RiverData> FILL_DATA = new NeighbourhoodWalker<>(WalkerNode.class, WalkerNode.class) {
         @Override
         protected @Nullable WalkerNode start(final int s, final Neighbourhood<Node> neighbourhood, final RiverData context) {
             final Node node = neighbourhood.get(s);
             if (node.incoming.isEmpty()) {
                 final WalkerNode walkerNode = new WalkerNode(context.height() + 1, node.depth, context.height() + 1, node.outgoing);
                 final int hash = SHM.outerHash(neighbourhood.toGlobal(s), 0);
-                walkerNode.tiles = randomDoubleFromLong(HashCommon.murmurHash3(hash | (long) hash << 32)) * 2 * context.rainfall()  + 1;
+                walkerNode.tiles = randomDoubleFromLong(HashCommon.murmurHash3(hash | (long) hash << 32)) * 2 * context.rainfall() + 1;
                 walkerNode.requiredFlowRate = 0;
                 return walkerNode;
             }
@@ -249,7 +249,7 @@ public final class RiverLayers {
         @Override
         protected RiverData finish(final int s, final WalkerNode val, final Neighbourhood<WalkerNode> neighbourhood, final RiverData context) {
             double humidity = val.flowRate;
-            for (RiverData.Incoming incoming : val.incomingHeights.values()) {
+            for (final RiverData.Incoming incoming : val.incomingHeights.values()) {
                 humidity = humidity - incoming.flowRate();
             }
             return new RiverData(context.type(), val.incomingHeights, val.outgoing, val.height, val.flowRate, val.tiles, context.level() - 1, (humidity + context.rainfall() * 4) * 0.2);
@@ -372,7 +372,6 @@ public final class RiverLayers {
     }
 
     public static Layer.Basic<RiverData> propagate(final int seed, final int level, final Layer<RiverData> prev) {
-        final SHM shm = SHM.create();
         final SHM.LevelCache cache = SHM.createCache(level);
         final SHM.MutableCoordinate mutable = SHM.createMutable();
         return new Layer.Basic<>(coordinate -> {
@@ -387,7 +386,7 @@ public final class RiverLayers {
             }
             final Map<Hex.Direction, RiverData.Incoming> incoming = new EnumMap<>(Hex.Direction.class);
             for (final Map.Entry<Hex.Direction, RiverData.Incoming> entry : data.incoming().entrySet()) {
-                shm.addMutable(coordinate, cache.offset(entry.getKey()), mutable);
+                SHM.MAX_LEVEL.addMutable(coordinate, cache.offset(entry.getKey()), mutable);
                 final RiverData riverData = prev.get(mutable);
                 incoming.put(entry.getKey(), new RiverData.Incoming(riverData.height(), riverData.tiles(), riverData.flowRate()));
                 base = base + riverData.flowRate();
@@ -401,20 +400,17 @@ public final class RiverLayers {
     }
 
     public static Layer.Basic<RiverData> zoom(final int level, final int seed, final Layer<RiverData> prev) {
-        final SHM shm = SHM.create();
         final SHM.LevelCache cache = SHM.createCache(level);
-        final SHM.LevelCache outerCache = SHM.createCache(level + 1);
         final NeighbourhoodFactory factory = NeighbourhoodFactory.create(level);
         final CachedExpandData cachedExpandData = new CachedExpandData(level);
         final Layer<SubRiverData> dataLayer = new Layer.CachingOuter<>(new Layer.Basic<>(coordinate -> {
             final RiverData data = prev.get(coordinate);
-            return zoomInternal(coordinate, data, level, shm, cache, outerCache, seed, factory, cachedExpandData);
+            return zoomInternal(coordinate, data, level, cache, seed, factory, cachedExpandData);
         }), 8, level + 1);
         return new Layer.Basic<>(coordinate -> dataLayer.get(coordinate).data[coordinate.get(level)]);
     }
 
-    private static SubRiverData zoomInternal(final SHM.Coordinate coordinate, final RiverData parentData, final int level, final SHM shm, final SHM.LevelCache cache, final SHM.LevelCache outerCache, final int seed, final NeighbourhoodFactory factory, final CachedExpandData cachedExpandData) {
-        final SHM.MutableCoordinate scratch0 = cachedExpandData.scratch0;
+    private static SubRiverData zoomInternal(final SHM.Coordinate coordinate, final RiverData parentData, final int level, final SHM.LevelCache cache, final int seed, final NeighbourhoodFactory factory, final CachedExpandData cachedExpandData) {
         if (parentData.type() == PlateType.OCEAN) {
             if (parentData.incoming().isEmpty() || (parentData.flowRate() - cachedExpandData.maxFlowRate) > 0) {
                 return new SubRiverData(new RiverData[]{parentData, parentData, parentData, parentData, parentData, parentData, parentData});
@@ -424,13 +420,13 @@ public final class RiverLayers {
             final RiverData empty = new RiverData(PlateType.OCEAN, Collections.emptyMap(), null, 0, 0, 0, level, -1);
             dataArr[truncated.get(level)] = empty;
             for (final Hex.Direction direction : DIRECTIONS) {
-                shm.addMutable(truncated, cache.offset(direction.rotateC()), scratch0);
+                final int o = SHM.MAX_LEVEL.offsetPartial(truncated, level, direction.rotateC());
                 if (parentData.incoming().containsKey(direction)) {
                     final RiverData.Incoming incoming = parentData.incoming().get(direction);
-                    final RiverData riverData = new RiverData(PlateType.OCEAN, Map.of(direction, incoming), null, 0, incoming.flowRate(), 1 + incoming.tiles() * 7, level,-1);
-                    dataArr[scratch0.get(level)] = riverData;
+                    final RiverData riverData = new RiverData(PlateType.OCEAN, Map.of(direction, incoming), null, 0, incoming.flowRate(), 1 + incoming.tiles() * 7, level, -1);
+                    dataArr[o] = riverData;
                 } else {
-                    dataArr[scratch0.get(level)] = empty;
+                    dataArr[o] = empty;
                 }
             }
             return new SubRiverData(dataArr);
@@ -540,7 +536,6 @@ public final class RiverLayers {
         private final Node[] nodes = new Node[7];
         private final NodeGetter nodeGetter;
         private final WalkerNodeGetter walkerNodeGetter;
-        private final SHM.MutableCoordinate scratch0;
         private final double maxFlowRate;
         private int splitSeed;
         private RiverData data;
@@ -551,7 +546,6 @@ public final class RiverLayers {
             }
             nodeGetter = new NodeGetter(level);
             walkerNodeGetter = new WalkerNodeGetter(level);
-            scratch0 = SHM.createMutable();
             maxFlowRate = Math.pow(SQRT3_3 * Math.pow(2.6457513, level), 3);
         }
 

@@ -1,7 +1,7 @@
-package io.github.stuff_stuffs.river_net_gen.api.neighbour.base;
+package io.github.stuff_stuffs.river_net_gen.river.neighbour.base;
 
-import io.github.stuff_stuffs.river_net_gen.api.neighbour.Neighbourhood;
-import io.github.stuff_stuffs.river_net_gen.api.util.Hex;
+import io.github.stuff_stuffs.river_net_gen.river.neighbour.Neighbourhood;
+import io.github.stuff_stuffs.river_net_gen.util.Hex;
 import it.unimi.dsi.fastutil.HashCommon;
 import org.jetbrains.annotations.Nullable;
 

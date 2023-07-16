@@ -1,7 +1,7 @@
-package io.github.stuff_stuffs.river_net_gen.api.neighbour;
+package io.github.stuff_stuffs.river_net_gen.river.neighbour;
 
-import io.github.stuff_stuffs.river_net_gen.api.util.Hex;
-import io.github.stuff_stuffs.river_net_gen.api.util.SHM;
+import io.github.stuff_stuffs.river_net_gen.util.Hex;
+import io.github.stuff_stuffs.river_net_gen.util.SHM;
 import org.jetbrains.annotations.Nullable;
 
 public interface Neighbourhood<T> {

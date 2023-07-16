@@ -1,6 +1,6 @@
-package io.github.stuff_stuffs.river_net_gen.api.layer;
+package io.github.stuff_stuffs.river_net_gen.river.layer;
 
-import io.github.stuff_stuffs.river_net_gen.api.util.SHM;
+import io.github.stuff_stuffs.river_net_gen.util.SHM;
 
 import java.util.function.Function;
 

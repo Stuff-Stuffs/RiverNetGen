@@ -1,6 +1,6 @@
-package io.github.stuff_stuffs.river_net_gen.api.util;
+package io.github.stuff_stuffs.river_net_gen.util;
 
-import io.github.stuff_stuffs.river_net_gen.impl.util.SHMImpl;
+import io.github.stuff_stuffs.river_net_gen.river.impl.util.SHMImpl;
 import it.unimi.dsi.fastutil.Hash;
 
 public interface SHM {
@@ -19,6 +19,8 @@ public interface SHM {
     void fromHexMutable(Hex.Coordinate coordinate, int level, MutableCoordinate result);
 
     void addMutable(Coordinate first, Coordinate second, MutableCoordinate result);
+
+    int offsetPartial(Coordinate coordinate, int level, Hex.Direction direction);
 
     static SHM create(final int level) {
         return new SHMImpl(level);
