@@ -13,11 +13,12 @@ public class GeoTest {
         final RandomGenerator generator = RandomGeneratorFactory.getDefault().create(1);
         final GeoColumn<GeoData> first = random(generator);
         final GeoColumn<GeoData> second = random(generator);
-        final GeoColumnInterpolator2d<GeoData> interpolator = new GeoColumnInterpolator2d<>(first, second);
+        GeoColumn<GeoData> third = random(generator);
+        final GeoColumnInterpolator3d<GeoData> interpolator = new GeoColumnInterpolator3d<>(new GeoColumnInterpolator3d.ColumnCoordinate(-1,-1), first, new GeoColumnInterpolator3d.ColumnCoordinate(-1,1), second, new GeoColumnInterpolator3d.ColumnCoordinate(3,3), third);
         ImageOut.draw(new ImageOut.Drawer() {
             @Override
             public void draw(final int x, final int y, final IntConsumer[] painters) {
-                final int color = interpolator.interpolate(x / (double) resolution, resolution-y).color;
+                final int color = interpolator.interpolate(x / (double) resolution, y, 0).color;
                 painters[0].accept(HashCommon.murmurHash3(color ^ HashCommon.murmurHash3(color + 123456789)));
             }
         }, resolution, resolution, "tgeo.png");

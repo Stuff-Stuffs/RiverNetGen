@@ -6,7 +6,12 @@ public class GeoColumn<T> {
 
     public GeoColumn(final T[] data, final int[] heights) {
         this.data = data;
-        this.heights = heights;
+        this.heights = new int[heights.length];
+        int sum = 0;
+        for (int i = 0; i < heights.length; i++) {
+            this.heights[i] = sum;
+            sum = sum + heights[i];
+        }
         if (data.length != heights.length) {
             throw new IllegalArgumentException();
         }

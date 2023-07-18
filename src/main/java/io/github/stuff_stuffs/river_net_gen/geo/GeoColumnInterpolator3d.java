@@ -13,6 +13,30 @@ public class GeoColumnInterpolator3d<T> {
         result = match(firstCoord, first, secondCoord, second, thirdCoord, third);
     }
 
+    public T interpolate(double x, double y, double z) {
+        Vec3d[] vertices = result.vertices;
+        Vec3d[] normals = result.normals;
+        int matched = -2;
+        for (int i = 0; i < vertices.length; i++) {
+            Vec3d d = vertices[i];
+            double rx = x - d.x;
+            double ry = y - d.y;
+            double rz = z - d.z;
+            Vec3d normal = normals[i];
+            double dot = rx * normal.x + ry * normal.y + rz * normal.z;
+            if(dot < 0) {
+                matched = i -1;
+                break;
+            }
+        }
+        if(matched==-2) {
+            return (T) result.data[result.data.length-1];
+        } else if(matched==-1) {
+            return (T) result.data[0];
+        }
+        return (T) result.data[matched];
+    }
+
     private static MatchResult match(final ColumnCoordinate firstCoord, final GeoColumn<?> first, final ColumnCoordinate secondCoord, final GeoColumn<?> second, final ColumnCoordinate thirdCoord, final GeoColumn<?> third) {
         int f = 0;
         int s = 0;
@@ -29,45 +53,22 @@ public class GeoColumnInterpolator3d<T> {
         while (f < fLength && s < sLength && t < tLength) {
             final Match3 match3 = match3(firstCoord, first, secondCoord, second, thirdCoord, third, f, s, t);
             if (match3 != null) {
-                final int fDiff = f - (prevSuccess + 1);
-                final int sDiff = match3.s - s;
-                final int tDiff = match3.t - t;
-                final int fCount = 0;
-                int sCount = 0;
-                int tCount = 0;
-                while (sCount < sDiff || tCount < tDiff) {
-                    final boolean chosen;
-                    if (tCount == tDiff) {
-                        chosen = true;
-                    } else if (sCount == sDiff) {
-                        chosen = false;
-                    } else {
-                        chosen = second.height(s + sCount) <= third.height(t + tCount);
-                    }
-                    if (chosen) {
-                        final double alpha = (sCount + 1) / (double) (sDiff + 1);
-                        normals.add(slerp(lastNorm, match3.normal, alpha));
-                        vertices.add(new Vec3d(secondCoord.x, second.height(s + sCount), secondCoord.z));
-                        data.add(second.data(s + sCount));
-                        sCount++;
-                    } else {
-                        final double alpha = (tCount + 1) / (double) (tDiff + 1);
-                        normals.add(slerp(lastNorm, match3.normal, alpha));
-                        vertices.add(new Vec3d(thirdCoord.x, second.height(t + tCount), thirdCoord.z));
-                        data.add(second.data(t + tCount));
-                        tCount++;
-                    }
-                }
+                fill(firstCoord, first, secondCoord, second, thirdCoord, third, prevSuccess, s, t, f, match3.s, match3.t, lastNorm, match3.normal, normals, vertices, data);
                 normals.add(match3.normal);
                 vertices.add(match3.point);
-                data.add(first.data(f));
-                lastNorm = match3.normal;
+                data.add(first.data(match3.f));
                 prevSuccess = f;
                 f = f + 1;
                 s = match3.s + 1;
                 t = match3.t + 1;
+            } else {
+                f = f + 1;
             }
         }
+        if(f!=fLength||s!=sLength||t!=tLength) {
+            fill(firstCoord, first, secondCoord, second, thirdCoord, third, prevSuccess, s, t, fLength, sLength, tLength, lastNorm, null, normals, vertices, data);
+        }
+        return new MatchResult(vertices.toArray(Vec3d[]::new), normals.toArray(Vec3d[]::new), data.toArray());
     }
 
     private static void fill(final ColumnCoordinate firstCoord, final GeoColumn<?> first, final ColumnCoordinate secondCoord, final GeoColumn<?> second, final ColumnCoordinate thirdCoord, final GeoColumn<?> third, final int fStart, final int sStart, final int tStart, final int fEnd, final int sEnd, final int tEnd, final Vec3d lastNormal, @Nullable final Vec3d nextNormal, final List<Vec3d> normals, final List<Vec3d> vertices, final List<Object> data) {
@@ -97,8 +98,8 @@ public class GeoColumnInterpolator3d<T> {
                 chosen = first.height(fCount + fStart) <= second.height(sCount + sStart) ? 0 : 1;
             } else {
                 final int fHeight = first.height(fStart + fCount);
-                final int sHeight = first.height(sStart + sCount);
-                final int tHeight = first.height(tStart + tCount);
+                final int sHeight = second.height(sStart + sCount);
+                final int tHeight = third.height(tStart + tCount);
                 if (fHeight <= sHeight) {
                     if (fHeight <= tHeight) {
                         chosen = 0;
@@ -149,7 +150,7 @@ public class GeoColumnInterpolator3d<T> {
                 vertices.add(vertex);
                 normals.add(normal);
                 data.add(third.data(tStart+tCount));
-                sCount++;
+                tCount++;
             }
         }
     }
@@ -182,7 +183,7 @@ public class GeoColumnInterpolator3d<T> {
                 final double ay = sHeight - fHeight;
                 final double by = tHeight - fHeight;
                 final double x = ay * bz - az * by;
-                final double y = ax * bz - az * bx;
+                final double y = az * bx - ax * bz;
                 final double z = ax * by - ay * bx;
                 final double invLength = 1 / Math.sqrt(x * x + y * y + z * z);
                 final Vec3d normal = new Vec3d(x * invLength, y * invLength, z * invLength);
