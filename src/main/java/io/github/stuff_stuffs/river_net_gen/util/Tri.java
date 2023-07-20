@@ -3,7 +3,6 @@ package io.github.stuff_stuffs.river_net_gen.util;
 import it.unimi.dsi.fastutil.HashCommon;
 
 import java.util.function.Function;
-import java.util.function.IntConsumer;
 
 public final class Tri {
     private static final double SQRT3_3 = Math.sqrt(3) / 3.0;
@@ -13,7 +12,7 @@ public final class Tri {
     }
 
     public static Coordinate fromCartesian(final double x, final double y) {
-        return new Coordinate((int) Math.ceil(1 * x - SQRT3_3 * y), (int) Math.floor(2 * SQRT3_3 * y) + 1, (int) Math.ceil(-1 * x - SQRT3_3 * y));
+        return new Coordinate((int) Math.ceil(x - SQRT3_3 * y), (int) Math.floor(2 * SQRT3_3 * y) + 1, (int) Math.ceil(-x - SQRT3_3 * y));
     }
 
     public static Coordinate[] corners(final Coordinate coordinate) {
@@ -62,34 +61,6 @@ public final class Tri {
         }
     }
 
-    public static void main(final String[] args) {
-        final double scale = 0.01;
-        ImageOut.draw(new ImageOut.Drawer() {
-            @Override
-            public void draw(final int x, final int y, final IntConsumer[] painters) {
-                final double rx = x * scale;
-                final double ry = y * scale;
-                final Coordinate center = Tri.fromCartesian(rx, ry);
-                final Coordinate[] coordinates = corners(center);
-                int total = 0;
-                for (int i = 0; i < 3; i++) {
-                    final int code = HashCommon.murmurHash3(HashCommon.murmurHash3(i + 123456789) + coordinates[i].hashCode());
-                    total = total ^ code;
-                    if (distance(rx, ry, coordinates[i]) < 0.2) {
-                        painters[i].accept(code);
-                    }
-                }
-                painters[3].accept(total);
-            }
-        }, 4096, 4096, "tTriangleRed.png", "tTriangleGreen.png", "tTriangleBlue.png", "tTriangleTotal.png");
-    }
-
-    private static double distance(final double x, final double y, final Coordinate coordinate) {
-        final double dx = x - coordinate.x();
-        final double dy = y - coordinate.y();
-        return Math.sqrt(dx * dx + dy * dy);
-    }
-
     private static double x(final int a, final int b, final int c) {
         return a * 0.5 - c * 0.5;
     }
@@ -111,22 +82,14 @@ public final class Tri {
             return (a + b + c) == 2;
         }
 
-        @Override
-        public boolean equals(final Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (!(o instanceof Coordinate that)) {
-                return false;
-            }
+        public boolean center() {
+            final int sum = a + b + c;
+            return sum == 1 | sum == 2;
+        }
 
-            if (a != that.a) {
-                return false;
-            }
-            if (b != that.b) {
-                return false;
-            }
-            return c == that.c;
+        public boolean vertex() {
+            final int sum = a + b + c;
+            return sum == 3;
         }
 
         @Override
