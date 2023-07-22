@@ -6,6 +6,7 @@ import java.util.random.RandomGenerator;
 import java.util.random.RandomGeneratorFactory;
 
 public class GeoColumnInterpolator3d {
+    private static final RandomGeneratorFactory<RandomGenerator> FACTORY = RandomGeneratorFactory.of("Xoroshiro128PlusPlus");
     private final Result fResult;
     private final Result sResult;
     private final Result tResult;
@@ -65,8 +66,7 @@ public class GeoColumnInterpolator3d {
         for (int i = 0; i < length; i++) {
             seed = HashCommon.murmurHash3(seed + 1) ^ column.data(i);
         }
-        final RandomGeneratorFactory<RandomGenerator> factory = RandomGeneratorFactory.of("Xoroshiro128PlusPlus");
-        final RandomGenerator generator = factory.create(seed);
+        final RandomGenerator generator = FACTORY.create(seed);
         final Section[] sections = new Section[length];
         final int[] data = new int[length];
         final double yScale = 1 / (double) (column.height(length - 1) + column.thickness(length - 1));
