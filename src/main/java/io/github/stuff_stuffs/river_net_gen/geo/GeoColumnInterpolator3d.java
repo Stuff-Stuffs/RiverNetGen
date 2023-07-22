@@ -26,7 +26,8 @@ public class GeoColumnInterpolator3d {
             final double dx = x - section.x;
             final double dy = 2 * (y * fResult.yScale - section.y);
             final double dz = z - section.z;
-            final double score = 1 / (Math.sqrt(dx * dx + dy * dy + dz * dz) + 4 * Math.abs(dx * section.nx + dy * section.ny + dz * section.nz));
+            final double manhattan = Math.abs(dx) + Math.abs(dy) + Math.abs(dz);
+            final double score = 1 / (manhattan + 4 * Math.abs(dx * section.nx + dy * section.ny + dz * section.nz));
             if (bestScore < score) {
                 bestScore = score;
                 best = fResult.data[i];
@@ -38,7 +39,8 @@ public class GeoColumnInterpolator3d {
             final double dx = x - section.x;
             final double dy = 2 * (y * sResult.yScale - section.y);
             final double dz = z - section.z;
-            final double score = 1 / (Math.sqrt(dx * dx + dy * dy + dz * dz) + 4 * Math.abs(dx * section.nx + dy * section.ny + dz * section.nz));
+            final double manhattan = Math.abs(dx) + Math.abs(dy) + Math.abs(dz);
+            final double score = 1 / (manhattan + 4 * Math.abs(dx * section.nx + dy * section.ny + dz * section.nz));
             if (bestScore < score) {
                 bestScore = score;
                 best = sResult.data[i];
@@ -51,7 +53,8 @@ public class GeoColumnInterpolator3d {
             final double dx = x - section.x;
             final double dy = 2 * (y * tResult.yScale - section.y);
             final double dz = z - section.z;
-            final double score = 1 / (Math.sqrt(dx * dx + dy * dy + dz * dz) + 4 * Math.abs(dx * section.nx + dy * section.ny + dz * section.nz));
+            final double manhattan = Math.abs(dx) + Math.abs(dy) + Math.abs(dz);
+            final double score = 1 / (manhattan + 4 * Math.abs(dx * section.nx + dy * section.ny + dz * section.nz));
             if (bestScore < score) {
                 bestScore = score;
                 best = tResult.data[i];
