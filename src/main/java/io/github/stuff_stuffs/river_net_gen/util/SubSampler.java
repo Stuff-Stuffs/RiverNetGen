@@ -50,9 +50,9 @@ public class SubSampler {
         y = y & mask;
         z = z & mask;
         final int rateMaskSq = (1 << (rateLog2*2)) - 1;
-        final int xSampleLower = x >> rateLog2;
-        final int ySampleLower = y >> rateLog2;
-        final int zSampleLower = z >> rateLog2;
+        final int xSampleLower = (x >> rateLog2) + 1;
+        final int ySampleLower = (y >> rateLog2) + 1;
+        final int zSampleLower = (z >> rateLog2) + 1;
         final int xSampleUpper = xSampleLower + 1;
         final int ySampleUpper = ySampleLower + 1;
         final int zSampleUpper = zSampleLower + 1;
@@ -72,7 +72,7 @@ public class SubSampler {
 
     private int choose(final int pos, int cutoff, final int lowerIndex, final int upperIndex, final int seed) {
         final int diffSq = pos - cutoff;
-        return seed < diffSq*diffSq ? upperIndex : lowerIndex;
+        return seed > diffSq*diffSq ? upperIndex : lowerIndex;
     }
 
     public interface ColumnSampler {
