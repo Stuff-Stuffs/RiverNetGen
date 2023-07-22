@@ -24,7 +24,9 @@ public class GeoTest {
 
             @Override
             protected void setupColumn(final int x, final int z) {
-                final Tri.Coordinate coordinate = Tri.fromCartesian(x * scale, z * scale);
+                final double scaledX = x * scale;
+                final double scaledZ = z * scale;
+                final Tri.Coordinate coordinate = Tri.fromCartesian(scaledX, scaledZ);
                 if (coordinate.equals(last)) {
                     return;
                 }
@@ -35,7 +37,9 @@ public class GeoTest {
 
             @Override
             public int sample(final int y) {
-                return interpolator.interpolate(getX() * scale, y, getZ() * scale);
+                final double scaledX = getX() * scale;
+                final double scaledZ = getZ() * scale;
+                return interpolator.interpolate(scaledX, y, scaledZ);
             }
         };
         final int samplerSize = 1 << samplerSizeLog2;
@@ -52,7 +56,7 @@ public class GeoTest {
                 final int sample = samplers[x / samplerSize][y / samplerSize].sample(x, y, 0);
                 painters[0].accept(HashCommon.murmurHash3(sample ^ HashCommon.murmurHash3(sample + 1)));
             }
-        }, resolution, resolution, "tGeoTest.png");
+        }, resolution, resolution, "tGeoTestSq.png");
     }
 
     private static GeoColumn random(final Tri.Coordinate coordinate, final int layerCount, final int colorCount, final int seed) {

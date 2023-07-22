@@ -49,7 +49,7 @@ public class SubSampler {
         x = x & mask;
         y = y & mask;
         z = z & mask;
-        final int rateMask = (1 << rateLog2) - 1;
+        final int rateMaskSq = (1 << (rateLog2*2)) - 1;
         final int xSampleLower = x >> rateLog2;
         final int ySampleLower = y >> rateLog2;
         final int zSampleLower = z >> rateLog2;
@@ -58,11 +58,11 @@ public class SubSampler {
         final int zSampleUpper = zSampleLower + 1;
         final int mixed = seed + (HashCommon.mix(x + 1234235) ^ HashCommon.mix(y + 214235) ^ HashCommon.mix(z));
         int randomState = HashCommon.murmurHash3(mixed);
-        final int xChosen = choose(x, xSampleLower << rateLog2, xSampleLower, xSampleUpper, randomState & rateMask);
+        final int xChosen = choose(x, xSampleLower << rateLog2, xSampleLower, xSampleUpper, randomState & rateMaskSq);
         randomState = mix(randomState, mixed);
-        final int yChosen = choose(y, ySampleLower << rateLog2, ySampleLower, ySampleUpper, randomState & rateMask);
+        final int yChosen = choose(y, ySampleLower << rateLog2, ySampleLower, ySampleUpper, randomState & rateMaskSq);
         randomState = mix(randomState, mixed);
-        final int zChosen = choose(z, zSampleLower << rateLog2, zSampleLower, zSampleUpper, randomState & rateMask);
+        final int zChosen = choose(z, zSampleLower << rateLog2, zSampleLower, zSampleUpper, randomState & rateMaskSq);
         return samples[(xChosen * count + zChosen) * count + yChosen];
     }
 
@@ -70,8 +70,9 @@ public class SubSampler {
         return HashCommon.mix(state + mixer);
     }
 
-    private int choose(final int pos, int lowerCoord, final int lower, final int upper, final int seed) {
-        return seed < pos - lowerCoord ? upper : lower;
+    private int choose(final int pos, int cutoff, final int lowerIndex, final int upperIndex, final int seed) {
+        final int diffSq = pos - cutoff;
+        return seed < diffSq*diffSq ? upperIndex : lowerIndex;
     }
 
     public interface ColumnSampler {
