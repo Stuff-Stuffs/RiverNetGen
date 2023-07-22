@@ -31,13 +31,12 @@ public class SubSampler {
         y = y & ~mask;
         z = z & ~mask;
         final int offset = 1 << rateLog2;
-        final int halfRate = offset >>> 1;
         final int[] samples = this.samples;
         for (int i = 0; i < count; i++) {
             for (int j = 0; j < count; j++) {
-                final ColumnSampler sampler = this.sampler.sampler(x + i * offset - halfRate, z + j * offset - halfRate);
+                final ColumnSampler sampler = this.sampler.sampler(x + i * offset - offset, z + j * offset - offset);
                 for (int k = 0; k < count; k++) {
-                    final int sample = sampler.sample(y + k * offset - halfRate);
+                    final int sample = sampler.sample(y + k * offset - offset);
                     final int index = (i * count + j) * count + k;
                     samples[index] = sample;
                 }
@@ -51,20 +50,28 @@ public class SubSampler {
         y = y & mask;
         z = z & mask;
         final int rateMask = (1 << rateLog2) - 1;
-        final int xSampleCoord = x >> rateLog2;
-        final int ySampleCoord = y >> rateLog2;
-        final int zSampleCoord = z >> rateLog2;
-        final int xSampleUpper = xSampleCoord + 1;
-        final int ySampleUpper = ySampleCoord + 1;
-        final int zSampleUpper = zSampleCoord + 1;
+        final int xSampleLower = x >> rateLog2;
+        final int ySampleLower = y >> rateLog2;
+        final int zSampleLower = z >> rateLog2;
+        final int xSampleUpper = xSampleLower + 1;
+        final int ySampleUpper = ySampleLower + 1;
+        final int zSampleUpper = zSampleLower + 1;
         final int mixed = seed + (HashCommon.mix(x + 1234235) ^ HashCommon.mix(y + 214235) ^ HashCommon.mix(z));
         int randomState = HashCommon.murmurHash3(mixed);
-        final int xChosen = (randomState & rateMask) < x - (xSampleCoord << rateLog2) ? xSampleUpper : xSampleCoord;
-        randomState = HashCommon.murmurHash3(randomState + mixed);
-        final int yChosen = (randomState & rateMask) < y - (ySampleCoord << rateLog2) ? ySampleUpper : ySampleCoord;
-        randomState = HashCommon.murmurHash3(randomState + mixed);
-        final int zChosen = (randomState & rateMask) < z - (zSampleCoord << rateLog2) ? zSampleUpper : zSampleCoord;
+        final int xChosen = choose(x, xSampleLower << rateLog2, xSampleLower, xSampleUpper, randomState & rateMask);
+        randomState = mix(randomState, mixed);
+        final int yChosen = choose(y, ySampleLower << rateLog2, ySampleLower, ySampleUpper, randomState & rateMask);
+        randomState = mix(randomState, mixed);
+        final int zChosen = choose(z, zSampleLower << rateLog2, zSampleLower, zSampleUpper, randomState & rateMask);
         return samples[(xChosen * count + zChosen) * count + yChosen];
+    }
+
+    private static int mix(final int state, final int mixer) {
+        return HashCommon.mix(state + mixer);
+    }
+
+    private int choose(final int pos, int lowerCoord, final int lower, final int upper, final int seed) {
+        return seed < pos - lowerCoord ? upper : lower;
     }
 
     public interface ColumnSampler {

@@ -1,5 +1,6 @@
 package io.github.stuff_stuffs.river_net_gen;
 
+import io.github.stuff_stuffs.river_net_gen.river.impl.util.SHMImpl;
 import io.github.stuff_stuffs.river_net_gen.river.layer.Layer;
 import io.github.stuff_stuffs.river_net_gen.river.layer.PlateType;
 import io.github.stuff_stuffs.river_net_gen.river.layer.RiverData;
@@ -7,11 +8,8 @@ import io.github.stuff_stuffs.river_net_gen.river.layer.RiverLayers;
 import io.github.stuff_stuffs.river_net_gen.util.Hex;
 import io.github.stuff_stuffs.river_net_gen.util.ImageOut;
 import io.github.stuff_stuffs.river_net_gen.util.SHM;
-import io.github.stuff_stuffs.river_net_gen.river.impl.util.SHMImpl;
 
 public class Test {
-
-
     public static void main(final String[] args) {
         final int seed = 777431342;
         final int layerCount = 5;
