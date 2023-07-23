@@ -84,10 +84,10 @@ public class GeoColumnInterpolator3d {
         final double yScale = 1 / (double) (column.height(length - 1) + column.thickness(length - 1));
         for (int i = 0; i < length; i++) {
             final double nx = (random.nextDouble() - 0.5) * 0.1;
-            final double ny = 1 - Math.abs(random.nextGaussian());
+            final double ny = random.nextDouble() * 2 - 1;
             final double nz = (random.nextDouble() - 0.5) * 0.1;
             final double lenInv = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
-            sections[i] = new Section(x, (column.height(i)) * yScale, z, nx * lenInv, ny * lenInv, nz * lenInv);
+            sections[i] = new Section(x, column.height(i) * yScale, z, nx * lenInv, ny * lenInv, nz * lenInv);
             data[i] = column.data(i);
         }
         return new Result(yScale, sections, data);
