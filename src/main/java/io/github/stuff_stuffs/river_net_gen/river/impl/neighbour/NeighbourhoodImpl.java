@@ -1,9 +1,9 @@
 package io.github.stuff_stuffs.river_net_gen.river.impl.neighbour;
 
+import io.github.stuff_stuffs.river_net_gen.river.impl.util.SHMImpl;
 import io.github.stuff_stuffs.river_net_gen.river.neighbour.Neighbourhood;
 import io.github.stuff_stuffs.river_net_gen.util.Hex;
 import io.github.stuff_stuffs.river_net_gen.util.SHM;
-import io.github.stuff_stuffs.river_net_gen.river.impl.util.SHMImpl;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Function;
@@ -14,12 +14,11 @@ public class NeighbourhoodImpl<T> implements Neighbourhood<T> {
 
     static {
         PACKED_ADDITION_TABLE = new int[7 * 7];
-        final SHM shm = SHM.create();
         for (int i = 0; i < 7; i++) {
             final SHM.Coordinate first = new SHMImpl.CoordinateImpl(i, (byte) SHMImpl.level(i));
             for (int j = 0; j < 7; j++) {
                 final SHM.Coordinate second = new SHMImpl.CoordinateImpl(j, (byte) SHMImpl.level(j));
-                final SHM.Coordinate add = shm.add(first, second);
+                final SHM.Coordinate add = SHM.add(first, second);
                 if (add.level() > 2) {
                     throw new IllegalStateException();
                 }
@@ -61,7 +60,7 @@ public class NeighbourhoodImpl<T> implements Neighbourhood<T> {
         if (s == 0) {
             return center;
         }
-        SHM.MAX_LEVEL.addMutable(center, offsets[s], mutable);
+        SHM.addMutable(center, offsets[s], mutable);
         return mutable;
     }
 
@@ -87,6 +86,6 @@ public class NeighbourhoodImpl<T> implements Neighbourhood<T> {
         if (s == 0) {
             return center;
         }
-        return SHM.MAX_LEVEL.add(center, offsets[s]);
+        return SHM.add(center, offsets[s]);
     }
 }

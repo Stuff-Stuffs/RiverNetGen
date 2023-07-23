@@ -4,30 +4,28 @@ import io.github.stuff_stuffs.river_net_gen.river.impl.util.SHMImpl;
 import it.unimi.dsi.fastutil.Hash;
 
 public interface SHM {
-    SHM MAX_LEVEL = SHM.create();
-
-    Coordinate fromHex(Hex.Coordinate coordinate);
-
-    Coordinate fromHex(Hex.Coordinate coordinate, int level);
-
-    Hex.Coordinate toHex(Coordinate coordinate);
-
-    Coordinate add(Coordinate first, Coordinate second);
-
-    void fromHexMutable(Hex.Coordinate coordinate, MutableCoordinate result);
-
-    void fromHexMutable(Hex.Coordinate coordinate, int level, MutableCoordinate result);
-
-    void addMutable(Coordinate first, Coordinate second, MutableCoordinate result);
-
-    int offsetPartial(Coordinate coordinate, int level, Hex.Direction direction);
-
-    static SHM create(final int level) {
-        return new SHMImpl(level);
+    static Coordinate fromHex(Hex.Coordinate coordinate, int level) {
+        return SHMImpl.fromHex(coordinate, level);
     }
 
-    static SHM create() {
-        return new SHMImpl();
+    static Hex.Coordinate toHex(Coordinate coordinate) {
+        return SHMImpl.toHex(coordinate);
+    }
+
+    static Coordinate add(Coordinate first, Coordinate second) {
+        return SHMImpl.add(first,second);
+    }
+
+    static void fromHexMutable(Hex.Coordinate coordinate, int level, MutableCoordinate result) {
+        SHMImpl.fromHexMutable(coordinate, level, result);
+    }
+
+    static void addMutable(Coordinate first, Coordinate second, MutableCoordinate result) {
+        SHMImpl.addMutable(first, second, result);
+    }
+
+    static int offsetPartial(Coordinate coordinate, int level, Hex.Direction direction) {
+        return SHMImpl.offsetPartial(coordinate, level, direction);
     }
 
     static LevelCache createCache(final int level) {

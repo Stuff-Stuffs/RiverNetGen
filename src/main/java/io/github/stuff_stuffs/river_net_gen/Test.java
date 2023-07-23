@@ -13,7 +13,7 @@ public class Test {
     public static void main(final String[] args) {
         final int seed = 777431342;
         final int layerCount = 5;
-        final Layer.Basic<PlateType> base = RiverLayers.enclaveDestructor(layerCount + 1, RiverLayers.base(seed, layerCount + 1));
+        final Layer.Basic<PlateType> base = RiverLayers.enclaveDestroyer(layerCount + 1, RiverLayers.base(seed, layerCount + 1));
         Layer.Basic<RiverData> riverBase = RiverLayers.riverBase(seed, layerCount, base);
         for (int i = 0; i < 2; i++) {
             riverBase = RiverLayers.grow(seed, layerCount, riverBase);
@@ -31,7 +31,6 @@ public class Test {
     }
 
     private static void draw(final double scale, final String prefix, final Layer<RiverData> layer, final boolean terrain, final boolean heightMap, final boolean tiles, final boolean humidity) {
-        final SHM shm = SHM.create();
         final SHM.LevelCache baseLevel = SHM.createCache(0);
         final int count = (terrain ? 1 : 0) + (heightMap ? 1 : 0) + (tiles ? 1 : 0) + (humidity ? 1 : 0);
         final String[] files = new String[count];
@@ -66,20 +65,20 @@ public class Test {
         }
         ImageOut.draw((x, y, painters) -> {
             final Hex.Coordinate coordinate = Hex.fromCartesian(x * scale, y * scale);
-            final SHM.Coordinate shmCoord = shm.fromHex(coordinate);
+            final SHM.Coordinate shmCoord = SHM.fromHex(coordinate, SHMImpl.MAX_LEVEL);
             final RiverData data = layer.get(shmCoord);
             final int effectiveLevel = data.level();
             if (terrainId != -1 || tilesId != -1) {
                 final SHMImpl.CoordinateImpl centerSHM = SHMImpl.outerTruncate(shmCoord, effectiveLevel);
-                final Hex.Coordinate center = shm.toHex(centerSHM);
+                final Hex.Coordinate center = SHM.toHex(centerSHM);
                 final double x0 = center.x();
                 final double y0 = center.y();
                 boolean terrainAccepted = terrainId == -1;
                 boolean tileAccepted = tilesId == -1;
                 if (data.outgoing() != null) {
-                    final SHM.Coordinate neighbourCoordinate = shm.add(shmCoord, SHM.shift(baseLevel.offset(data.outgoing()), effectiveLevel));
+                    final SHM.Coordinate neighbourCoordinate = SHM.add(shmCoord, SHM.shift(baseLevel.offset(data.outgoing()), effectiveLevel));
                     final RiverData outgoingData = layer.get(neighbourCoordinate);
-                    final Hex.Coordinate neighbourCenterCoordinate = shm.toHex(SHM.outerTruncate(neighbourCoordinate, outgoingData.level()));
+                    final Hex.Coordinate neighbourCenterCoordinate = SHM.toHex(SHM.outerTruncate(neighbourCoordinate, outgoingData.level()));
                     final double x1 = neighbourCenterCoordinate.x();
                     final double y1 = neighbourCenterCoordinate.y();
                     final double flowWidth = flowRemap(data.flowRate());
@@ -99,15 +98,15 @@ public class Test {
                 }
                 for (final Hex.Direction direction : data.incoming().keySet()) {
                     Hex.Direction offsetDir = direction;
-                    SHM.Coordinate offset = shm.add(centerSHM, SHM.shift(baseLevel.offset(offsetDir), effectiveLevel));
+                    SHM.Coordinate offset = SHM.add(centerSHM, SHM.shift(baseLevel.offset(offsetDir), effectiveLevel));
                     RiverData neighbourData = layer.get(offset);
                     final Hex.Coordinate incoming;
                     offsetDir = offsetDir.opposite().rotateC();
                     for (int i = effectiveLevel - 1; i >= neighbourData.level(); i--) {
-                        offset = shm.add(offset, SHM.shift(baseLevel.offset(offsetDir), i));
+                        offset = SHM.add(offset, SHM.shift(baseLevel.offset(offsetDir), i));
                         neighbourData = layer.get(offset);
                     }
-                    incoming = shm.toHex(SHMImpl.outerTruncate(offset, neighbourData.level()));
+                    incoming = SHM.toHex(SHMImpl.outerTruncate(offset, neighbourData.level()));
                     final double x1 = incoming.x();
                     final double y1 = incoming.y();
                     final double flowWidth = flowRemap(neighbourData.flowRate());

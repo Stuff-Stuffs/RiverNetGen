@@ -240,7 +240,7 @@ public final class RiverLayers {
             final WalkerNode parent = states[offset];
             if (parent != null) {
                 final double overFlow = parent.flowRate - parent.requiredFlowRate;
-                node.flowRate = node.requiredFlowRate + overFlow * (node.tiles / (double) (parent.tiles + 1));
+                node.flowRate = node.requiredFlowRate + overFlow * (node.tiles / (parent.tiles + 1));
                 return node;
             }
             return null;
@@ -262,7 +262,7 @@ public final class RiverLayers {
         return new Layer.Basic<>(coordinate -> plateOfCoordinate(coordinate, seed, strategy));
     }
 
-    public static Layer.Basic<PlateType> enclaveDestructor(final int level, final Layer<PlateType> prev) {
+    public static Layer.Basic<PlateType> enclaveDestroyer(final int level, final Layer<PlateType> prev) {
         final NeighbourhoodFactory factory = NeighbourhoodFactory.create(level);
         return new Layer.Basic<>(coordinate -> {
             final PlateType type = prev.get(coordinate);
@@ -292,7 +292,7 @@ public final class RiverLayers {
                 final Map<Hex.Direction, RiverData.Incoming> incoming = new EnumMap<>(Hex.Direction.class);
                 double flowSum = 0;
                 for (final Hex.Direction direction : DIRECTIONS) {
-                    SHM.MAX_LEVEL.addMutable(coordinate, cache.offset(direction), mutable);
+                    SHM.addMutable(coordinate, cache.offset(direction), mutable);
                     final Hex.Direction adjacentOutgoing = outgoingBase(mutable, factory.build(mutable, prev), seed, cache);
                     if (adjacentOutgoing != null && adjacentOutgoing.opposite() == direction) {
                         final double flowBase = flowBase(mutable, seed, outer);
@@ -319,7 +319,6 @@ public final class RiverLayers {
     }
 
     public static Layer.Basic<RiverData> grow(final int seed, final int level, final Layer<RiverData> prev) {
-        final SHM shm = SHM.create();
         final SHM.LevelCache cache = SHM.createCache(level);
         final NeighbourhoodFactory factory = NeighbourhoodFactory.create(level);
         final SHM.MutableCoordinate mutable = SHM.createMutable();
@@ -331,7 +330,7 @@ public final class RiverLayers {
                 } else {
                     final Map<Hex.Direction, RiverData.Incoming> incoming = new EnumMap<>(Hex.Direction.class);
                     for (final Hex.Direction direction : data.incoming().keySet()) {
-                        shm.addMutable(coordinate, cache.offset(direction), mutable);
+                        SHM.addMutable(coordinate, cache.offset(direction), mutable);
                         final RiverData neighbourData = prev.get(mutable);
                         incoming.put(direction, new RiverData.Incoming(1, neighbourData.tiles(), neighbourData.flowRate()));
                     }
@@ -344,7 +343,7 @@ public final class RiverLayers {
                     if (direction == data.outgoing()) {
                         continue;
                     }
-                    shm.addMutable(coordinate, cache.offset(direction), mutable);
+                    SHM.addMutable(coordinate, cache.offset(direction), mutable);
                     final Neighbourhood<RiverData> neighbourhood = factory.build(mutable, prev);
                     final RiverData neighbourData = neighbourhood.get(neighbourhood.center());
                     if (neighbourData.type() == PlateType.OCEAN || neighbourData.outgoing() != null) {
@@ -386,7 +385,7 @@ public final class RiverLayers {
             }
             final Map<Hex.Direction, RiverData.Incoming> incoming = new EnumMap<>(Hex.Direction.class);
             for (final Map.Entry<Hex.Direction, RiverData.Incoming> entry : data.incoming().entrySet()) {
-                SHM.MAX_LEVEL.addMutable(coordinate, cache.offset(entry.getKey()), mutable);
+                SHM.addMutable(coordinate, cache.offset(entry.getKey()), mutable);
                 final RiverData riverData = prev.get(mutable);
                 incoming.put(entry.getKey(), new RiverData.Incoming(riverData.height(), riverData.tiles(), riverData.flowRate()));
                 base = base + riverData.flowRate();
@@ -420,7 +419,7 @@ public final class RiverLayers {
             final RiverData empty = new RiverData(PlateType.OCEAN, Collections.emptyMap(), null, 0, 0, 0, level, -1);
             dataArr[truncated.get(level)] = empty;
             for (final Hex.Direction direction : DIRECTIONS) {
-                final int o = SHM.MAX_LEVEL.offsetPartial(truncated, level, direction.rotateC());
+                final int o = SHM.offsetPartial(truncated, level, direction.rotateC());
                 if (parentData.incoming().containsKey(direction)) {
                     final RiverData.Incoming incoming = parentData.incoming().get(direction);
                     final RiverData riverData = new RiverData(PlateType.OCEAN, Map.of(direction, incoming), null, 0, incoming.flowRate(), 1 + incoming.tiles() * 7, level, -1);
@@ -487,22 +486,22 @@ public final class RiverLayers {
     }
 
     public static final class Node {
-        private Hex.@Nullable Direction outgoing;
-        private final Object2DoubleMap<Hex.Direction> incoming = new Object2DoubleOpenHashMap<>();
-        private int depth = -1;
+        public Hex.@Nullable Direction outgoing;
+        public final Object2DoubleMap<Hex.Direction> incoming = new Object2DoubleOpenHashMap<>();
+        public int depth = -1;
     }
 
     public static final class WalkerNode {
-        private final Map<Hex.Direction, RiverData.Incoming> incomingHeights = new EnumMap<>(Hex.Direction.class);
-        private final double minHeightAlongPath;
-        private final int minDepthAlongPath;
-        private final double height;
-        private final Hex.Direction outgoing;
-        private double tiles;
-        private double requiredFlowRate = Double.NaN;
-        private double flowRate = Double.NaN;
+        public final Map<Hex.Direction, RiverData.Incoming> incomingHeights = new EnumMap<>(Hex.Direction.class);
+        public final double minHeightAlongPath;
+        public final int minDepthAlongPath;
+        public final double height;
+        public final Hex.Direction outgoing;
+        public double tiles;
+        public double requiredFlowRate = Double.NaN;
+        public double flowRate = Double.NaN;
 
-        private WalkerNode(final double minHeightAlongPath, final int minDepthAlongPath, final double height, final Hex.Direction outgoing) {
+        public WalkerNode(final double minHeightAlongPath, final int minDepthAlongPath, final double height, final Hex.Direction outgoing) {
             this.minHeightAlongPath = minHeightAlongPath;
             this.minDepthAlongPath = minDepthAlongPath;
             this.height = height;
@@ -510,11 +509,11 @@ public final class RiverLayers {
         }
     }
 
-    private static final class PathTree {
-        private final int start;
-        private final Hex.Direction[] outgoing;
-        private final int[] depth;
-        private final long[] children;
+    public static final class PathTree {
+        public final int start;
+        public final Hex.Direction[] outgoing;
+        public final int[] depth;
+        public final long[] children;
 
         private PathTree(final int start) {
             this.start = start;
@@ -524,15 +523,15 @@ public final class RiverLayers {
         }
     }
 
-    private static final class PathResult {
-        private final Node[] nodes;
+    public static final class PathResult {
+        public final Node[] nodes;
 
-        private PathResult(final Node[] nodes) {
+        public PathResult(final Node[] nodes) {
             this.nodes = nodes;
         }
     }
 
-    private static final class CachedExpandData {
+    public static final class CachedExpandData {
         private final Node[] nodes = new Node[7];
         private final NodeGetter nodeGetter;
         private final WalkerNodeGetter walkerNodeGetter;
@@ -558,7 +557,7 @@ public final class RiverLayers {
         }
     }
 
-    private record SubRiverData(RiverData[] data) {
+    public record SubRiverData(RiverData[] data) {
     }
 
     private RiverLayers() {

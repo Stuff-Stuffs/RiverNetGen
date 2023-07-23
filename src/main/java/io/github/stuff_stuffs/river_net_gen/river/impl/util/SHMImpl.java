@@ -53,8 +53,6 @@ public final class SHMImpl implements SHM {
         code[2] = -c1;
     }
 
-    private final int defaultLevel;
-
     public static byte idFromDirection(final Hex.Direction direction) {
         return switch (direction) {
             case UP -> 5;
@@ -79,13 +77,7 @@ public final class SHMImpl implements SHM {
         return new CoordinateImpl(impl.data << shift * 3, (byte) Math.min(impl.level() + shift, MAX_LEVEL));
     }
 
-    @Override
-    public CoordinateImpl fromHex(final Hex.Coordinate coordinate) {
-        return fromHex(coordinate, defaultLevel);
-    }
-
-    @Override
-    public CoordinateImpl fromHex(final Hex.Coordinate coordinate, final int level) {
+    public static CoordinateImpl fromHex(final Hex.Coordinate coordinate, final int level) {
         final long data = fromHex0(coordinate, level);
         return new CoordinateImpl(data, (byte) level(data));
     }
@@ -95,7 +87,7 @@ public final class SHMImpl implements SHM {
         return (Long.SIZE - zeros + 2) / 3;
     }
 
-    private long fromHex0(final Hex.Coordinate coordinate, final int level) {
+    private static long fromHex0(final Hex.Coordinate coordinate, final int level) {
         int q = coordinate.q();
         int r = coordinate.r();
         int l = 0;
@@ -117,8 +109,7 @@ public final class SHMImpl implements SHM {
         return data;
     }
 
-    @Override
-    public Hex.Coordinate toHex(final Coordinate coordinate) {
+    public static Hex.Coordinate toHex(final Coordinate coordinate) {
         final int level = coordinate.level();
         int q = 0;
         int r = 0;
@@ -133,13 +124,12 @@ public final class SHMImpl implements SHM {
         return new Hex.Coordinate(q, r);
     }
 
-    @Override
-    public CoordinateImpl add(final Coordinate first, final Coordinate second) {
+    public static CoordinateImpl add(final Coordinate first, final Coordinate second) {
         final long data = add0(first, second);
         return new CoordinateImpl(data, (byte) level(data));
     }
 
-    private long add0(final Coordinate first, final Coordinate second) {
+    private static long add0(final Coordinate first, final Coordinate second) {
         final int firstLevel = first.level();
         int len = Math.max(firstLevel, second.level());
         long buffer1 = ((CoordinateImpl) first).data;
@@ -165,29 +155,21 @@ public final class SHMImpl implements SHM {
         return res;
     }
 
-    @Override
-    public int offsetPartial(final Coordinate coordinate, final int level, final Hex.Direction direction) {
+    public static int offsetPartial(final Coordinate coordinate, final int level, final Hex.Direction direction) {
         final int f = coordinate.get(level);
         final int s = idFromDirection(direction);
         final byte sum = ADDITION_TABLE[f * 7 + s];
         return sum & 0x7;
     }
 
-    @Override
-    public void fromHexMutable(final Hex.Coordinate coordinate, final MutableCoordinate result) {
-        fromHexMutable(coordinate, defaultLevel, result);
-    }
-
-    @Override
-    public void fromHexMutable(final Hex.Coordinate coordinate, final int level, final MutableCoordinate result) {
+    public static void fromHexMutable(final Hex.Coordinate coordinate, final int level, final MutableCoordinate result) {
         final long data = fromHex0(coordinate, level);
         final MutableCoordinateImpl impl = (MutableCoordinateImpl) result;
         impl.data = data;
         impl.last = (byte) level(data);
     }
 
-    @Override
-    public void addMutable(final Coordinate first, final Coordinate second, final MutableCoordinate result) {
+    public static void addMutable(final Coordinate first, final Coordinate second, final MutableCoordinate result) {
         final long data = add0(first, second);
         final MutableCoordinateImpl impl = (MutableCoordinateImpl) result;
         impl.data = data;
@@ -375,14 +357,6 @@ public final class SHMImpl implements SHM {
         }
     }
 
-    public SHMImpl() {
-        this(MAX_LEVEL);
-    }
-
-    public SHMImpl(final int level) {
-        if (level < 0 || level > MAX_LEVEL) {
-            throw new IllegalArgumentException();
-        }
-        defaultLevel = level;
+    private SHMImpl() {
     }
 }
