@@ -56,7 +56,7 @@ public class SubSampler {
         final int xSampleUpper = xSampleLower + 1;
         final int ySampleUpper = ySampleLower + 1;
         final int zSampleUpper = zSampleLower + 1;
-        final int mixed = seed + (HashCommon.mix(x + 1234235) ^ HashCommon.mix(y + 214235) ^ HashCommon.mix(z));
+        final int mixed = seed + (HashCommon.mix(x ^ HashCommon.mix(y  ^ HashCommon.mix(z))));
         int randomState = HashCommon.murmurHash3(mixed);
         final int xChosen = choose(x, xSampleLower << rateLog2, xSampleLower, xSampleUpper, randomState & rateMaskSq);
         randomState = mix(randomState, mixed);
