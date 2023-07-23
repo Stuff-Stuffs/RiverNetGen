@@ -1,20 +1,21 @@
 package io.github.stuff_stuffs.river_net_gen.geo;
 
+import io.github.stuff_stuffs.river_net_gen.util.ProceduralRandom;
 import it.unimi.dsi.fastutil.HashCommon;
 
-import java.util.random.RandomGenerator;
-import java.util.random.RandomGeneratorFactory;
-
 public class GeoColumnInterpolator3d {
-    private static final RandomGeneratorFactory<RandomGenerator> FACTORY = RandomGeneratorFactory.of("Xoroshiro128PlusPlus");
     private final Result fResult;
     private final Result sResult;
     private final Result tResult;
 
     public GeoColumnInterpolator3d(final double x0, final double z0, final GeoColumn first, final double x1, final double z1, final GeoColumn second, final double x2, final double z2, final GeoColumn third) {
-        fResult = build(x0, z0, first);
-        sResult = build(x1, z1, second);
-        tResult = build(x2, z2, third);
+        this(x0, z0, first, x1, z1, second, x2, z2, third, ProceduralRandom.Factory.XOROSHIRO.create(tripleSeed(first, second, third)));
+    }
+
+    public GeoColumnInterpolator3d(final double x0, final double z0, final GeoColumn first, final double x1, final double z1, final GeoColumn second, final double x2, final double z2, final GeoColumn third, final ProceduralRandom random) {
+        fResult = build(x0, z0, first, random);
+        sResult = build(x1, z1, second, random);
+        tResult = build(x2, z2, third, random);
     }
 
     public int interpolate(final double x, final double y, final double z) {
@@ -63,20 +64,28 @@ public class GeoColumnInterpolator3d {
         return best;
     }
 
-    private static Result build(final double x, final double z, final GeoColumn column) {
+    private static long tripleSeed(final GeoColumn first, final GeoColumn second, final GeoColumn third) {
+        return HashCommon.mix(computeSeed(first) ^ HashCommon.mix(computeSeed(second) ^ HashCommon.mix(computeSeed(third)) + 1) + 1);
+    }
+
+    private static long computeSeed(final GeoColumn column) {
         long seed = 0;
         final int length = column.length();
         for (int i = 0; i < length; i++) {
             seed = HashCommon.murmurHash3(seed + 1) ^ column.data(i);
         }
-        final RandomGenerator generator = FACTORY.create(seed);
+        return seed;
+    }
+
+    private static Result build(final double x, final double z, final GeoColumn column, final ProceduralRandom random) {
+        final int length = column.length();
         final Section[] sections = new Section[length];
         final int[] data = new int[length];
         final double yScale = 1 / (double) (column.height(length - 1) + column.thickness(length - 1));
         for (int i = 0; i < length; i++) {
-            final double nx = (generator.nextDouble() - 0.5) * 0.1;
-            final double ny = 1 - Math.abs(generator.nextGaussian());
-            final double nz = (generator.nextDouble() - 0.5) * 0.1;
+            final double nx = (random.nextDouble() - 0.5) * 0.1;
+            final double ny = 1 - Math.abs(random.nextGaussian());
+            final double nz = (random.nextDouble() - 0.5) * 0.1;
             final double lenInv = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
             sections[i] = new Section(x, (column.height(i)) * yScale, z, nx * lenInv, ny * lenInv, nz * lenInv);
             data[i] = column.data(i);

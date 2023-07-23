@@ -16,6 +16,22 @@ public final class Tri {
     }
 
     public static Coordinate[] corners(final Coordinate coordinate) {
+        final Coordinate f;
+        final Coordinate s;
+        final Coordinate t;
+        if (coordinate.up()) {
+            f = new Coordinate(coordinate.a + 1, coordinate.b, coordinate.c);
+            s = new Coordinate(coordinate.a, coordinate.b, coordinate.c + 1);
+            t = new Coordinate(coordinate.a, coordinate.b + 1, coordinate.c);
+        } else {
+            f = new Coordinate(coordinate.a, coordinate.b + 1, coordinate.c + 1);
+            s = new Coordinate(coordinate.a + 1, coordinate.b + 1, coordinate.c);
+            t = new Coordinate(coordinate.a + 1, coordinate.b, coordinate.c + 1);
+        }
+        return new Coordinate[]{f, s, t};
+    }
+
+    public static Coordinate[] sortedCorners(final Coordinate coordinate) {
         if (coordinate.up()) {
             final Coordinate f = new Coordinate(coordinate.a + 1, coordinate.b, coordinate.c);
             final Coordinate s = new Coordinate(coordinate.a, coordinate.b, coordinate.c + 1);
