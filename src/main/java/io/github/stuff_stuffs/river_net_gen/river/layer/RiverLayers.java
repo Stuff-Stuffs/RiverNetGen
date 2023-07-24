@@ -419,13 +419,13 @@ public final class RiverLayers {
             final RiverData empty = new RiverData(PlateType.OCEAN, Collections.emptyMap(), null, 0, 0, 0, level, -1);
             dataArr[truncated.get(level)] = empty;
             for (final Hex.Direction direction : DIRECTIONS) {
-                final int o = SHM.offsetPartial(truncated, level, direction.rotateC());
+                final int offsetIndex = SHM.offsetPartial(truncated, level, direction.rotateC());
                 if (parentData.incoming().containsKey(direction)) {
                     final RiverData.Incoming incoming = parentData.incoming().get(direction);
                     final RiverData riverData = new RiverData(PlateType.OCEAN, Map.of(direction, incoming), null, 0, incoming.flowRate(), 1 + incoming.tiles() * 7, level, -1);
-                    dataArr[o] = riverData;
+                    dataArr[offsetIndex] = riverData;
                 } else {
-                    dataArr[o] = empty;
+                    dataArr[offsetIndex] = empty;
                 }
             }
             return new SubRiverData(dataArr);

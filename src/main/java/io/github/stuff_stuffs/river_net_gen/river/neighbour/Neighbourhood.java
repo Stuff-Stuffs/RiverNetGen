@@ -7,6 +7,8 @@ import org.jetbrains.annotations.Nullable;
 public interface Neighbourhood<T> {
     int center();
 
+    int centerHash();
+
     T get(int s);
 
     default T get(final int s, final Hex.Direction offset) {

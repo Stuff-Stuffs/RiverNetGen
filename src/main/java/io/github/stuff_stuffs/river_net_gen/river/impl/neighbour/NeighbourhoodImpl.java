@@ -31,6 +31,8 @@ public class NeighbourhoodImpl<T> implements Neighbourhood<T> {
     private final SHM.Coordinate[] offsets;
     private final SHM.Coordinate center;
     private final SHM.MutableCoordinate mutable = SHM.createMutable();
+    private boolean hasCenterHash = false;
+    private int centerHash = 0;
 
     public NeighbourhoodImpl(final Function<SHM.Coordinate, T> delegate, final SHM.Coordinate[] offsets, final SHM.Coordinate center) {
         this.delegate = delegate;
@@ -41,6 +43,15 @@ public class NeighbourhoodImpl<T> implements Neighbourhood<T> {
     @Override
     public int center() {
         return 0;
+    }
+
+    @Override
+    public int centerHash() {
+        if(!hasCenterHash) {
+            centerHash = SHM.outerHash(center, 0);
+            hasCenterHash = true;
+        }
+        return centerHash;
     }
 
     @Override
