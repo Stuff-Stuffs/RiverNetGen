@@ -12,14 +12,14 @@ import io.github.stuff_stuffs.river_net_gen.util.SHM;
 public class Test {
     public static void main(final String[] args) {
         final int seed = 777431342;
-        final int layerCount = 5;
+        final int layerCount = 3;
         final Layer.Basic<PlateType> base = RiverLayers.enclaveDestroyer(layerCount + 1, RiverLayers.base(seed, layerCount + 1));
         Layer.Basic<RiverData> riverBase = RiverLayers.riverBase(seed, layerCount, base);
         for (int i = 0; i < 2; i++) {
-            riverBase = RiverLayers.grow(seed, layerCount, riverBase);
+            riverBase = RiverLayers.growBase(seed, layerCount, riverBase);
         }
         for (int i = 0; i < 2; i++) {
-            riverBase = RiverLayers.propagate(seed, layerCount, riverBase);
+            riverBase = RiverLayers.propagateBase(seed, layerCount, riverBase);
         }
         Layer<RiverData> layer = riverBase;
         for (int i = layerCount - 1; i >= 0; i--) {
@@ -145,7 +145,7 @@ public class Test {
                     painters[humidityId].accept(i | (i << 8) | (i << 16));
                 }
             }
-        }, 8192, 8192, files);
+        }, 2048, 2048, files);
     }
 
     private static double flowRemap(final double x) {

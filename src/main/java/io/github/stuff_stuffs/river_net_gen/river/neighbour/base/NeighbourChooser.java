@@ -21,8 +21,8 @@ public abstract class NeighbourChooser<T> {
         for (final Hex.Direction direction : DIRECTIONS) {
             final T val = neighbourhood.get(center, direction);
             final double weight = weight(val, centerVal, direction, neighbourhood, state);
-            state = HashCommon.mix(state + 12345 ^ seed) ^ state;
             if (weight > 0) {
+                state = HashCommon.mix(state + seed) ^ state;
                 neighbours[count] = direction;
                 weights[count++] = weight;
                 weightSum += weight;

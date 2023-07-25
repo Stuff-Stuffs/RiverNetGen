@@ -6,6 +6,7 @@ import io.github.stuff_stuffs.river_net_gen.river.neighbour.base.NeighbourChoose
 import io.github.stuff_stuffs.river_net_gen.river.neighbour.base.NeighbourWeightedWalker;
 import io.github.stuff_stuffs.river_net_gen.river.neighbour.base.NeighbourhoodPredicate;
 import io.github.stuff_stuffs.river_net_gen.river.neighbour.base.NeighbourhoodWalker;
+import io.github.stuff_stuffs.river_net_gen.util.GenUtil;
 import io.github.stuff_stuffs.river_net_gen.util.Hex;
 import io.github.stuff_stuffs.river_net_gen.util.SHM;
 import it.unimi.dsi.fastutil.Hash;
@@ -107,7 +108,7 @@ public final class RiverLayers {
             } else {
                 weight = weight + weightAngle(data.data.outgoing(), fromDirection.opposite());
             }
-            return weight + 70 * randomDoubleFromLong(HashCommon.mix(data.splitSeed ^ HashCommon.mix(seed - 123456789L) ^ HashCommon.mix(from * 63 + 1) ^ HashCommon.mix(to * 127 + 3)));
+            return weight + 70 * GenUtil.randomDoubleFromLong(HashCommon.mix(data.splitSeed ^ HashCommon.mix(seed - 123456789L) ^ HashCommon.mix(from * 63 + 1) ^ HashCommon.mix(to * 127 + 3)));
         }
 
         private double weightAngle(final Hex.Direction outgoing, final Hex.Direction incoming) {
@@ -127,7 +128,7 @@ public final class RiverLayers {
             if (node.incoming.isEmpty()) {
                 final WalkerNode walkerNode = new WalkerNode(context.height() + 1, node.depth, context.height() + 1, node.outgoing);
                 final int hash = SHM.outerHash(neighbourhood.toGlobal(s), 0);
-                walkerNode.tiles = randomDoubleFromLong(HashCommon.murmurHash3(hash | (long) hash << 32)) * 2 * context.rainfall() + 1;
+                walkerNode.tiles = GenUtil.randomDoubleFromLong(HashCommon.murmurHash3(hash | (long) hash << 32)) * 2 * context.rainfall() + 1;
                 walkerNode.requiredFlowRate = 0;
                 return walkerNode;
             }
@@ -255,6 +256,12 @@ public final class RiverLayers {
             return new RiverData(context.type(), val.incomingHeights, val.outgoing, val.height, val.flowRate, val.tiles, context.level() - 1, (humidity + context.rainfall() * 4) * 0.2);
         }
     };
+    public static NeighbourChooser<RiverData> COASTLINE_GROW = new NeighbourChooser<>() {
+        @Override
+        protected double weight(RiverData val, RiverData center, Hex.Direction direction, Neighbourhood<RiverData> neighbourhood, long seed) {
+            return val.outgoing() != null ? 1 / val.tiles() : 0;
+        }
+    };
 
     public static Layer.Basic<PlateType> base(final int seed, final int level) {
         final SHM.LevelCache cache = SHM.createCache(level);
@@ -307,18 +314,14 @@ public final class RiverLayers {
         });
     }
 
-    private static double randomDoubleFromLong(final long state) {
-        return (state >>> 11) * 0x1.0p-53;
-    }
-
     private static double flowBase(final SHM.Coordinate coordinate, final int seed, final Hash.Strategy<SHM.Coordinate> strategy) {
         final int hashCode = strategy.hashCode(coordinate);
         final int start = HashCommon.mix(seed ^ hashCode) ^ HashCommon.murmurHash3(hashCode);
         final long data = HashCommon.murmurHash3(HashCommon.mix((long) start | (((long) start) << 32L)) + 123456);
-        return 7 + 7 * (data >>> 11) * 0x1.0p-53;
+        return 7 + 7 * GenUtil.randomDoubleFromLong(data);
     }
 
-    public static Layer.Basic<RiverData> grow(final int seed, final int level, final Layer<RiverData> prev) {
+    public static Layer.Basic<RiverData> growBase(final int seed, final int level, final Layer<RiverData> prev) {
         final SHM.LevelCache cache = SHM.createCache(level);
         final NeighbourhoodFactory factory = NeighbourhoodFactory.create(level);
         final SHM.MutableCoordinate mutable = SHM.createMutable();
@@ -370,7 +373,7 @@ public final class RiverLayers {
         });
     }
 
-    public static Layer.Basic<RiverData> propagate(final int seed, final int level, final Layer<RiverData> prev) {
+    public static Layer.Basic<RiverData> propagateBase(final int seed, final int level, final Layer<RiverData> prev) {
         final SHM.LevelCache cache = SHM.createCache(level);
         final SHM.MutableCoordinate mutable = SHM.createMutable();
         return new Layer.Basic<>(coordinate -> {
@@ -443,6 +446,52 @@ public final class RiverLayers {
         cachedExpandData.walkerNodeGetter.nodes = walk.raw();
         final NeighbourhoodWalker.Result<RiverData> flowWalk = FLOW_FILL.walk(factory.build(truncated, cachedExpandData.walkerNodeGetter), parentData);
         return new SubRiverData(flowWalk.raw());
+    }
+
+    public static Layer<RiverData> coastlineGrow(int level, int seed, Layer<RiverData> prev) {
+        NeighbourhoodFactory factory = NeighbourhoodFactory.create(level);
+        SHM.LevelCache levelCache = SHM.createCache(level);
+        SHM.MutableCoordinate mutable = SHM.createMutable();
+        Hash.Strategy<SHM.Coordinate> strategy = levelCache.outer();
+        return new Layer.Basic<>(new Function<SHM.Coordinate, RiverData>() {
+            @Override
+            public RiverData apply(SHM.Coordinate coordinate) {
+                RiverData parentData = prev.get(coordinate);
+                if(parentData.type()==PlateType.OCEAN) {
+                    if (!parentData.incoming().isEmpty()) {
+                        return parentData;
+                    }
+                    int mixedSeed = HashCommon.murmurHash3(SHM.outerHash(coordinate, level) + seed);
+                    Hex. @Nullable Direction chosen = COASTLINE_GROW.choose(factory.build(coordinate, prev), mixedSeed);
+                    if(chosen==null) {
+                        return parentData;
+                    }
+                    SHM.addMutable(coordinate, levelCache.offset(chosen), mutable);
+                    RiverData downStream = prev.get(mutable);
+                    return new RiverData(PlateType.CONTINENT, Collections.emptyMap(), chosen, downStream.height() + 1, flowBase(coordinate, mixedSeed, strategy), 1, level, 0);
+                }
+                Map<Hex.Direction, RiverData.Incoming> incoming = null;
+                for (Hex.Direction direction : DIRECTIONS) {
+                    SHM.addMutable(coordinate, levelCache.offset(direction), mutable);
+                    RiverData maybeUpStream = prev.get(mutable);
+                    if(maybeUpStream.type()==PlateType.CONTINENT || !maybeUpStream.incoming().isEmpty()) {
+                        continue;
+                    }
+                    int mixedSeed = HashCommon.murmurHash3(SHM.outerHash(mutable, level) + seed);
+                    Hex.Direction chosen = COASTLINE_GROW.choose(factory.build(mutable, prev), mixedSeed);
+                    if(direction.opposite()==chosen) {
+                        if(incoming==null) {
+                            incoming = new EnumMap<>(Hex.Direction.class);
+                        }
+                        incoming.put(direction, new RiverData.Incoming(parentData.height() + 1, 1, flowBase(mutable, mixedSeed, strategy)))
+                    }
+                }
+                if(incoming==null) {
+                    return parentData;
+                }
+                return null;
+            }
+        });
     }
 
     private static final class NodeGetter implements Function<SHM.Coordinate, Node> {

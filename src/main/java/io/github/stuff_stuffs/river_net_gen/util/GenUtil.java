@@ -22,6 +22,10 @@ public final class GenUtil {
         throw new RuntimeException();
     }
 
+    public static double randomDoubleFromLong(final long state) {
+        return (state >>> 11) * 0x1.0p-53;
+    }
+
     private GenUtil() {
     }
 }
