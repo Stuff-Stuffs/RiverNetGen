@@ -12,7 +12,7 @@ import io.github.stuff_stuffs.river_net_gen.util.SHM;
 public class Test {
     public static void main(final String[] args) {
         final int seed = 777431342;
-        final int layerCount = 3;
+        final int layerCount = 4;
         final Layer.Basic<PlateType> base = RiverLayers.enclaveDestroyer(layerCount + 1, RiverLayers.base(seed, layerCount + 1));
         Layer.Basic<RiverData> riverBase = RiverLayers.riverBase(seed, layerCount, base);
         for (int i = 0; i < 2; i++) {
@@ -23,8 +23,8 @@ public class Test {
         }
         Layer<RiverData> layer = riverBase;
         for (int i = layerCount - 1; i >= 0; i--) {
-            final Layer.Basic<RiverData> zoom = RiverLayers.zoom(i, seed, layer);
-            layer = zoom;
+            final Layer<RiverData> zoom = RiverLayers.zoom(i, seed, layer);
+            layer = RiverLayers.coastlineGrow(i+2, i, seed, zoom);
         }
         final double scale = 1 / 6.0;
         draw(scale, "triver", layer, true, true, true, true);

@@ -240,8 +240,8 @@ public final class RiverLayers {
             final int offset = neighbourhood.offset(s, node.outgoing);
             final WalkerNode parent = states[offset];
             if (parent != null) {
-                final double overFlow = parent.flowRate - parent.requiredFlowRate;
-                node.flowRate = node.requiredFlowRate + overFlow * (node.tiles / (parent.tiles + 1));
+                final double overFlow = Math.max(parent.flowRate - parent.requiredFlowRate, 0) * 1.2;
+                node.flowRate = node.requiredFlowRate + overFlow * (node.tiles / (parent.tiles));
                 return node;
             }
             return null;
@@ -258,8 +258,8 @@ public final class RiverLayers {
     };
     public static NeighbourChooser<RiverData> COASTLINE_GROW = new NeighbourChooser<>() {
         @Override
-        protected double weight(RiverData val, RiverData center, Hex.Direction direction, Neighbourhood<RiverData> neighbourhood, long seed) {
-            return val.outgoing() != null ? 1 / val.tiles() : 0;
+        protected double weight(final RiverData val, final RiverData center, final Hex.Direction direction, final Neighbourhood<RiverData> neighbourhood, final long seed) {
+            return val.outgoing() != null && center.level() == val.level() ? 1 / val.tiles() : 0;
         }
     };
 
@@ -318,7 +318,14 @@ public final class RiverLayers {
         final int hashCode = strategy.hashCode(coordinate);
         final int start = HashCommon.mix(seed ^ hashCode) ^ HashCommon.murmurHash3(hashCode);
         final long data = HashCommon.murmurHash3(HashCommon.mix((long) start | (((long) start) << 32L)) + 123456);
-        return 7 + 7 * GenUtil.randomDoubleFromLong(data);
+        return 1 + 1 * GenUtil.randomDoubleFromLong(data);
+    }
+
+    private static double flowCoastline(final SHM.Coordinate coordinate, final int seed, final Hash.Strategy<SHM.Coordinate> strategy) {
+        final int hashCode = strategy.hashCode(coordinate);
+        final int start = HashCommon.mix(seed ^ hashCode) ^ HashCommon.murmurHash3(hashCode);
+        final long data = HashCommon.murmurHash3(HashCommon.mix((long) start | (((long) start) << 32L)) + 123456);
+        return 0.1 + 0.05 * GenUtil.randomDoubleFromLong(data);
     }
 
     public static Layer.Basic<RiverData> growBase(final int seed, final int level, final Layer<RiverData> prev) {
@@ -414,8 +421,12 @@ public final class RiverLayers {
 
     private static SubRiverData zoomInternal(final SHM.Coordinate coordinate, final RiverData parentData, final int level, final SHM.LevelCache cache, final int seed, final NeighbourhoodFactory factory, final CachedExpandData cachedExpandData) {
         if (parentData.type() == PlateType.OCEAN) {
-            if (parentData.incoming().isEmpty() || (parentData.flowRate() - cachedExpandData.maxFlowRate) > 0) {
+            if ((parentData.flowRate() - cachedExpandData.maxFlowRate) > 0) {
                 return new SubRiverData(new RiverData[]{parentData, parentData, parentData, parentData, parentData, parentData, parentData});
+            }
+            if (parentData.incoming().isEmpty()) {
+                final RiverData lowered = new RiverData(PlateType.OCEAN, Collections.emptyMap(), null, 0, 0, 1, level, 0);
+                return new SubRiverData(new RiverData[]{lowered, lowered, lowered, lowered, lowered, lowered, lowered});
             }
             final SHM.Coordinate truncated = SHM.outerTruncate(coordinate, level + 1);
             final RiverData[] dataArr = new RiverData[7];
@@ -448,49 +459,60 @@ public final class RiverLayers {
         return new SubRiverData(flowWalk.raw());
     }
 
-    public static Layer<RiverData> coastlineGrow(int level, int seed, Layer<RiverData> prev) {
-        NeighbourhoodFactory factory = NeighbourhoodFactory.create(level);
-        SHM.LevelCache levelCache = SHM.createCache(level);
-        SHM.MutableCoordinate mutable = SHM.createMutable();
-        Hash.Strategy<SHM.Coordinate> strategy = levelCache.outer();
-        return new Layer.Basic<>(new Function<SHM.Coordinate, RiverData>() {
-            @Override
-            public RiverData apply(SHM.Coordinate coordinate) {
-                RiverData parentData = prev.get(coordinate);
-                if(parentData.type()==PlateType.OCEAN) {
-                    if (!parentData.incoming().isEmpty()) {
-                        return parentData;
-                    }
-                    int mixedSeed = HashCommon.murmurHash3(SHM.outerHash(coordinate, level) + seed);
-                    Hex. @Nullable Direction chosen = COASTLINE_GROW.choose(factory.build(coordinate, prev), mixedSeed);
-                    if(chosen==null) {
-                        return parentData;
-                    }
-                    SHM.addMutable(coordinate, levelCache.offset(chosen), mutable);
-                    RiverData downStream = prev.get(mutable);
-                    return new RiverData(PlateType.CONTINENT, Collections.emptyMap(), chosen, downStream.height() + 1, flowBase(coordinate, mixedSeed, strategy), 1, level, 0);
-                }
-                Map<Hex.Direction, RiverData.Incoming> incoming = null;
-                for (Hex.Direction direction : DIRECTIONS) {
-                    SHM.addMutable(coordinate, levelCache.offset(direction), mutable);
-                    RiverData maybeUpStream = prev.get(mutable);
-                    if(maybeUpStream.type()==PlateType.CONTINENT || !maybeUpStream.incoming().isEmpty()) {
-                        continue;
-                    }
-                    int mixedSeed = HashCommon.murmurHash3(SHM.outerHash(mutable, level) + seed);
-                    Hex.Direction chosen = COASTLINE_GROW.choose(factory.build(mutable, prev), mixedSeed);
-                    if(direction.opposite()==chosen) {
-                        if(incoming==null) {
-                            incoming = new EnumMap<>(Hex.Direction.class);
-                        }
-                        incoming.put(direction, new RiverData.Incoming(parentData.height() + 1, 1, flowBase(mutable, mixedSeed, strategy)))
-                    }
-                }
-                if(incoming==null) {
+    public static Layer<RiverData> coastlineGrow(final int growChance, final int level, final int seed, final Layer<RiverData> prev) {
+        final NeighbourhoodFactory factory = NeighbourhoodFactory.create(level);
+        final SHM.LevelCache levelCache = SHM.createCache(level);
+        final SHM.MutableCoordinate mutable = SHM.createMutable();
+        return new Layer.Basic<>(coordinate -> {
+            final RiverData parentData = prev.get(coordinate);
+            if (parentData.type() == PlateType.OCEAN) {
+                if (!parentData.incoming().isEmpty()) {
                     return parentData;
                 }
-                return null;
+                final int mixedSeed = HashCommon.murmurHash3(SHM.outerHash(coordinate, level) + seed);
+                if (mixedSeed % growChance != 0) {
+                    return parentData;
+                }
+                final Hex.@Nullable Direction chosen = COASTLINE_GROW.choose(factory.build(coordinate, prev), mixedSeed);
+                if (chosen == null) {
+                    return parentData;
+                }
+                SHM.addMutable(coordinate, levelCache.offset(chosen), mutable);
+                final RiverData downStream = prev.get(mutable);
+                return new RiverData(PlateType.CONTINENT, Collections.emptyMap(), chosen, downStream.height() + 1, Math.min(downStream.flowRate(), flowCoastline(coordinate, seed, levelCache.outer())), 1, level, 0);
             }
+            if (parentData.outgoing() == null) {
+                return parentData;
+            }
+            Map<Hex.Direction, RiverData.Incoming> incoming = null;
+            double tiles = 0;
+            for (final Hex.Direction direction : DIRECTIONS) {
+                if (parentData.outgoing() == direction || parentData.incoming().containsKey(direction)) {
+                    continue;
+                }
+                SHM.addMutable(coordinate, levelCache.offset(direction), mutable);
+                final RiverData maybeUpStream = prev.get(mutable);
+                if (maybeUpStream.type() == PlateType.CONTINENT || !maybeUpStream.incoming().isEmpty()) {
+                    continue;
+                }
+                final int mixedSeed = HashCommon.murmurHash3(SHM.outerHash(mutable, level) + seed);
+                if (mixedSeed % growChance != 0) {
+                    continue;
+                }
+                final Hex.Direction chosen = COASTLINE_GROW.choose(factory.build(mutable, prev), mixedSeed);
+                if (direction.opposite() == chosen) {
+                    if (incoming == null) {
+                        incoming = new EnumMap<>(Hex.Direction.class);
+                    }
+                    tiles = tiles + 1;
+                    incoming.put(direction, new RiverData.Incoming(parentData.height() + 1, 1, Math.min(parentData.flowRate(), flowCoastline(mutable, seed, levelCache.outer()))));
+                }
+            }
+            if (incoming == null) {
+                return parentData;
+            }
+            incoming.putAll(parentData.incoming());
+            return new RiverData(PlateType.CONTINENT, incoming, parentData.outgoing(), parentData.height(), parentData.flowRate(), parentData.tiles() + tiles, level, parentData.rainfall());
         });
     }
 
