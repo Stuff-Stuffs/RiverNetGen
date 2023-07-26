@@ -12,8 +12,8 @@ import io.github.stuff_stuffs.river_net_gen.util.SHM;
 public class Test {
     public static void main(final String[] args) {
         final int seed = 777431342;
-        final int layerCount = 4;
-        final Layer.Basic<PlateType> base = RiverLayers.enclaveDestroyer(layerCount + 1, RiverLayers.base(seed, layerCount + 1));
+        final int layerCount = 5;
+        final Layer.Basic<PlateType> base = RiverLayers.destroyEnclaves(layerCount + 1, RiverLayers.base(seed, layerCount + 1));
         Layer.Basic<RiverData> riverBase = RiverLayers.riverBase(seed, layerCount, base);
         for (int i = 0; i < 2; i++) {
             riverBase = RiverLayers.growBase(seed, layerCount, riverBase);
@@ -23,10 +23,10 @@ public class Test {
         }
         Layer<RiverData> layer = riverBase;
         for (int i = layerCount - 1; i >= 0; i--) {
-            final Layer<RiverData> zoom = RiverLayers.zoom(i, seed, layer);
-            layer = RiverLayers.coastlineGrow(i+2, i, seed, zoom);
+            layer = RiverLayers.zoom(i, seed, new Layer.CachingOuter<>(RiverLayers.coastlineGrow(i+1, seed, layer), 8, i+1));
         }
-        final double scale = 1 / 6.0;
+        layer = RiverLayers.coastlineGrow(0, seed, layer);
+        final double scale = 1 / 4.0;
         draw(scale, "triver", layer, true, true, true, true);
     }
 
@@ -145,7 +145,7 @@ public class Test {
                     painters[humidityId].accept(i | (i << 8) | (i << 16));
                 }
             }
-        }, 2048, 2048, files);
+        }, 4096, 4096, files);
     }
 
     private static double flowRemap(final double x) {
