@@ -9,13 +9,17 @@ import java.util.Set;
 public interface GeoFeatureApplicator {
     int apply(double x, double y, double z);
 
-    void setFeatures(Collection<? extends GeoFeature> features, Collection<String> additionalMaterials);
+    void setFeatures(Collection<? extends GeoFeature> features);
 
     Set<String> geoIdentifiers();
 
     OptionalInt getGeoId(String identifier);
 
-    static GeoFeatureApplicator create(final GeoFeature base, final int maxDepth) {
+    interface BaseGeoFeature {
+        GeoFeature.Instance setup(GeoFeature.Registry registry);
+    }
+
+    static GeoFeatureApplicator create(final BaseGeoFeature base, final int maxDepth) {
         return new GeoFeatureApplicatorImpl(base, maxDepth);
     }
 }

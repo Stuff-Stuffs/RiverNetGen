@@ -15,7 +15,7 @@ public class DikeGeoFeature implements GeoFeature {
         this.y = y;
         this.z = z;
         final double scale = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
-        if (!Double.isFinite(scale)) {
+        if (!Double.isFinite(scale) || scale == 0) {
             throw new IllegalArgumentException();
         }
         this.nx = nx * scale;
@@ -26,7 +26,7 @@ public class DikeGeoFeature implements GeoFeature {
     }
 
     @Override
-    public double age() {
+    public double timeStamp() {
         return age;
     }
 
@@ -39,7 +39,7 @@ public class DikeGeoFeature implements GeoFeature {
             final double dz = context.z() - z;
             if (dx * dx + dy * dy + dz * dz >= radius * radius) {
                 context.setQuery();
-            } else if (Math.abs(nx * dx + ny * dy + nz * dz) <= thickness) {
+            } else if (Math.abs(nx * dx + ny * dy + nz * dz) * 2 <= thickness) {
                 context.set(materialGeoId);
             } else {
                 context.setQuery();

@@ -9,6 +9,7 @@ public class SubSampler {
     private final int seed;
     private final XZSampler sampler;
     private final int[] samples;
+    private int sampleSeed;
 
     public SubSampler(final int sizeLog2, final int rateLog2, final XZSampler sampler, final int seed) {
         this.sizeLog2 = sizeLog2;
@@ -30,6 +31,7 @@ public class SubSampler {
         x = x & ~mask;
         y = y & ~mask;
         z = z & ~mask;
+        sampleSeed = HashCommon.mix((x + seed) ^ HashCommon.mix((y + seed) ^ HashCommon.mix(z + seed)));
         final int offset = 1 << rateLog2;
         final int[] samples = this.samples;
         for (int i = 0; i < count; i++) {
@@ -49,14 +51,14 @@ public class SubSampler {
         x = x & mask;
         y = y & mask;
         z = z & mask;
-        final int rateMaskSq = (1 << (rateLog2*2)) - 1;
+        final int rateMaskSq = (1 << (rateLog2 * 2)) - 1;
         final int xSampleLower = (x >> rateLog2) + 1;
         final int ySampleLower = (y >> rateLog2) + 1;
         final int zSampleLower = (z >> rateLog2) + 1;
         final int xSampleUpper = xSampleLower + 1;
         final int ySampleUpper = ySampleLower + 1;
         final int zSampleUpper = zSampleLower + 1;
-        final int mixed = seed + (HashCommon.mix(x ^ HashCommon.mix(y  ^ HashCommon.mix(z))));
+        final int mixed = sampleSeed + (HashCommon.mix(x ^ HashCommon.mix(y ^ HashCommon.mix(z))));
         int randomState = HashCommon.murmurHash3(mixed);
         final int xChosen = choose(x, xSampleLower << rateLog2, xSampleLower, xSampleUpper, randomState & rateMaskSq);
         randomState = mix(randomState, mixed);
@@ -70,9 +72,9 @@ public class SubSampler {
         return HashCommon.mix(state + mixer);
     }
 
-    private int choose(final int pos, int cutoff, final int lowerIndex, final int upperIndex, final int seed) {
+    private int choose(final int pos, final int cutoff, final int lowerIndex, final int upperIndex, final int seed) {
         final int diffSq = pos - cutoff;
-        return seed > diffSq*diffSq ? upperIndex : lowerIndex;
+        return seed > diffSq * diffSq ? upperIndex : lowerIndex;
     }
 
     public interface ColumnSampler {

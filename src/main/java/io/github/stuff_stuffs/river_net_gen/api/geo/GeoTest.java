@@ -2,7 +2,6 @@ package io.github.stuff_stuffs.river_net_gen.api.geo;
 
 import io.github.stuff_stuffs.river_net_gen.api.geo.column.GeoColumn;
 import io.github.stuff_stuffs.river_net_gen.api.geo.column.GeoColumnInterpolator3d;
-import io.github.stuff_stuffs.river_net_gen.api.geo.feature.ConstantGeoFeature;
 import io.github.stuff_stuffs.river_net_gen.api.geo.feature.DikeGeoFeature;
 import io.github.stuff_stuffs.river_net_gen.api.geo.feature.GeoFeatureApplicator;
 import io.github.stuff_stuffs.river_net_gen.api.util.ImageOut;
@@ -12,7 +11,6 @@ import it.unimi.dsi.fastutil.HashCommon;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.function.IntConsumer;
 
@@ -26,41 +24,28 @@ public class GeoTest {
         final int samplerWidth = (resolution - 1 + (1 << samplerSizeLog2)) / (1 << samplerSizeLog2);
         final SubSampler[][] samplers = new SubSampler[samplerWidth][samplerWidth];
         final double scale = 0.005;
-        final DikeGeoFeature feature = new DikeGeoFeature(0, "rock", 200, 0, 0, 1, -1, 0, 4, 2000);
-        final GeoFeatureApplicator applicator = GeoFeatureApplicator.create(new ConstantGeoFeature(0, "none"), 4);
+        final DikeGeoFeature feature = new DikeGeoFeature(0, "rock", 200, 400, 0, 1, -1, 0, 7, 500);
         final List<String> rocks = List.of("base0", "base1", "base2", "base3", "base4", "base5", "base6", "base7");
-        applicator.setFeatures(Collections.singleton(feature), rocks);
-        final int noneMaterial = applicator.getGeoId("none").getAsInt();
-        final Object2IntMap<String> cache = new Object2IntOpenHashMap<>(rocks.size() * 4);
-        for (final String rock : rocks) {
-            cache.put(rock, applicator.getGeoId(rock).getAsInt());
-        }
+        final Tri.Cache<GeoColumnInterpolator3d> interpolators = new Tri.Cache<>(8, coordinate -> {
+            final Tri.Coordinate[] corners = Tri.sortedCorners(coordinate);
+            return new GeoColumnInterpolator3d(corners[0].x(), corners[0].y(), random(corners[0], layerCount, rocks, seed), corners[1].x(), corners[1].y(), random(corners[1], layerCount, rocks, seed), corners[2].x(), corners[2].y(), random(corners[2], layerCount, rocks, seed));
+        });
+        final GeoFeatureApplicator applicator = GeoFeatureApplicator.create(registry -> {
+            final Object2IntMap<String> cache = new Object2IntOpenHashMap<>(4 * rocks.size());
+            for (final String rock : rocks) {
+                cache.put(rock, registry.getGeoId(rock));
+            }
+            return context -> context.set(cache.getInt(interpolators.get(Tri.fromCartesian(context.x() * scale, context.z() * scale)).interpolate(context.x() * scale, context.y(), context.z() * scale)));
+        }, 4);
+        applicator.setFeatures(List.of(feature));
         final SubSampler.XZSampler xzSampler = new SubSampler.AbstractSampler() {
-            private GeoColumnInterpolator3d interpolator;
-            private Tri.Coordinate last = null;
-
             @Override
             protected void setupColumn(final int x, final int z) {
-                final double scaledX = x * scale;
-                final double scaledZ = z * scale;
-                final Tri.Coordinate coordinate = Tri.fromCartesian(scaledX, scaledZ);
-                if (coordinate.equals(last)) {
-                    return;
-                }
-                final Tri.Coordinate[] corners = Tri.corners(coordinate);
-                interpolator = new GeoColumnInterpolator3d(corners[0].x(), corners[0].y(), random(corners[0], layerCount, rocks, seed), corners[1].x(), corners[1].y(), random(corners[1], layerCount, rocks, seed), corners[2].x(), corners[2].y(), random(corners[2], layerCount, rocks, seed));
-                last = coordinate;
             }
 
             @Override
             public int sample(final int y) {
-                final double scaledX = getX() * scale;
-                final double scaledZ = getZ() * scale;
-                final int apply = applicator.apply(getX(), y, getZ());
-                if (apply == noneMaterial) {
-                    return cache.getInt(interpolator.interpolate(scaledX, y, scaledZ));
-                }
-                return apply;
+                return applicator.apply(getX(), y, getZ());
             }
         };
         final int samplerSize = 1 << samplerSizeLog2;

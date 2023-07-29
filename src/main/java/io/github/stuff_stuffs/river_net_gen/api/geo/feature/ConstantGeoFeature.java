@@ -10,7 +10,7 @@ public class ConstantGeoFeature implements GeoFeature {
     }
 
     @Override
-    public double age() {
+    public double timeStamp() {
         return age;
     }
 

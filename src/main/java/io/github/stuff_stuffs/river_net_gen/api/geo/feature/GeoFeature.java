@@ -1,7 +1,7 @@
 package io.github.stuff_stuffs.river_net_gen.api.geo.feature;
 
 public interface GeoFeature {
-    double age();
+    double timeStamp();
 
     Instance setup(Registry registry);
 
@@ -22,7 +22,7 @@ public interface GeoFeature {
 
         void z(double z);
 
-        int query();
+        int query(double x, double y, double z);
 
         void setQuery();
 

@@ -9,8 +9,8 @@ import it.unimi.dsi.fastutil.objects.ObjectIterators;
 import java.util.*;
 
 public class GeoFeatureApplicatorImpl implements GeoFeatureApplicator {
-    private static final Comparator<GeoFeature> OLDEST_FIRST = Comparator.comparingDouble(GeoFeature::age).reversed();
-    private final GeoFeature base;
+    private static final Comparator<GeoFeature> OLDEST_FIRST = Comparator.comparingDouble(GeoFeature::timeStamp);
+    private final BaseGeoFeature base;
     private final int maxDepth;
     private final GeoFeatureContextImpl root;
     private final GeoFeatureContextImpl[] contexts;
@@ -20,7 +20,7 @@ public class GeoFeatureApplicatorImpl implements GeoFeatureApplicator {
     private GeoFeature.Instance baseInstance;
     private RegistryImpl registry;
 
-    public GeoFeatureApplicatorImpl(final GeoFeature base, final int maxDepth) {
+    public GeoFeatureApplicatorImpl(final BaseGeoFeature base, final int maxDepth) {
         this.base = base;
         this.maxDepth = maxDepth;
         root = new GeoFeatureContextImpl(this, maxDepth);
@@ -40,7 +40,7 @@ public class GeoFeatureApplicatorImpl implements GeoFeatureApplicator {
     }
 
     @Override
-    public void setFeatures(final Collection<? extends GeoFeature> features, final Collection<String> additionalMaterials) {
+    public void setFeatures(final Collection<? extends GeoFeature> features) {
         final int unwrap = ObjectIterators.unwrap(features.iterator(), featureStack);
         this.features = unwrap;
         Arrays.sort(featureStack, 0, unwrap, OLDEST_FIRST);
@@ -48,9 +48,6 @@ public class GeoFeatureApplicatorImpl implements GeoFeatureApplicator {
             throw new RuntimeException();
         }
         registry = new RegistryImpl();
-        for (final String material : additionalMaterials) {
-            registry.getGeoId(material);
-        }
         baseInstance = base.setup(registry);
         for (int i = 0; i < unwrap; i++) {
             instances[i] = featureStack[i].setup(registry);
@@ -152,7 +149,7 @@ public class GeoFeatureApplicatorImpl implements GeoFeatureApplicator {
         }
 
         @Override
-        public int query() {
+        public int query(final double x, final double y, final double z) {
             return parent.query(index, x, y, z);
         }
 
@@ -172,7 +169,7 @@ public class GeoFeatureApplicatorImpl implements GeoFeatureApplicator {
             if (computed) {
                 return result;
             } else if (fallThrough) {
-                return query();
+                return query(x, y, z);
             }
             throw new IllegalStateException();
         }
