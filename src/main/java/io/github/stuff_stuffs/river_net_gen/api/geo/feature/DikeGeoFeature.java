@@ -1,33 +1,33 @@
 package io.github.stuff_stuffs.river_net_gen.api.geo.feature;
 
 public class DikeGeoFeature implements GeoFeature {
-    private final double age;
+    private final double timeStamp;
     private final String material;
     private final double x, y, z;
-    private final double nx, ny, nz;
+    private final double tx, ty, tz;
     private final double thickness;
     private final double radius;
 
-    public DikeGeoFeature(final double age, final String material, final double x, final double y, final double z, final double nx, final double ny, final double nz, final double thickness, final double radius) {
-        this.age = age;
+    public DikeGeoFeature(final double timeStamp, final String material, final double x, final double y, final double z, final double tx, final double ty, final double tz, final double thickness, final double radius) {
+        this.timeStamp = timeStamp;
         this.material = material;
         this.x = x;
         this.y = y;
         this.z = z;
-        final double scale = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
+        final double scale = 1 / Math.sqrt(tx * tx + ty * ty + tz * tz);
         if (!Double.isFinite(scale) || scale == 0) {
             throw new IllegalArgumentException();
         }
-        this.nx = nx * scale;
-        this.ny = ny * scale;
-        this.nz = nz * scale;
+        this.tx = tx * scale;
+        this.ty = ty * scale;
+        this.tz = tz * scale;
         this.thickness = thickness;
         this.radius = radius;
     }
 
     @Override
     public double timeStamp() {
-        return age;
+        return timeStamp;
     }
 
     @Override
@@ -39,7 +39,7 @@ public class DikeGeoFeature implements GeoFeature {
             final double dz = context.z() - z;
             if (dx * dx + dy * dy + dz * dz >= radius * radius) {
                 context.setQuery();
-            } else if (Math.abs(nx * dx + ny * dy + nz * dz) * 2 <= thickness) {
+            } else if (Math.abs(tx * dx + ty * dy + tz * dz) * 2 <= thickness) {
                 context.set(materialGeoId);
             } else {
                 context.setQuery();
