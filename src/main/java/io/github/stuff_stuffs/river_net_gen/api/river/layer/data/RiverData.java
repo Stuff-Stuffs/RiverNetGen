@@ -1,5 +1,6 @@
-package io.github.stuff_stuffs.river_net_gen.api.river.layer;
+package io.github.stuff_stuffs.river_net_gen.api.river.layer.data;
 
+import io.github.stuff_stuffs.river_net_gen.api.river.layer.PlateType;
 import io.github.stuff_stuffs.river_net_gen.api.util.Hex;
 import org.jetbrains.annotations.Nullable;
 
