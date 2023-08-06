@@ -50,6 +50,9 @@ public abstract class NeighbourhoodWalker<R, State, Input, Context> {
                 }
             }
         }
+        if (count != 7) {
+            throw new IllegalStateException();
+        }
         final int center = neighbourhood.center();
         final int up = neighbourhood.offset(center, Hex.Direction.UP);
         final int upRight = neighbourhood.offset(center, Hex.Direction.UP_RIGHT);
