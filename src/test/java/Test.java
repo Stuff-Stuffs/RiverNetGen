@@ -1,6 +1,3 @@
-package io.github.stuff_stuffs.river_net_gen;
-
-import io.github.stuff_stuffs.river_net_gen.impl.util.SHMImpl;
 import io.github.stuff_stuffs.river_net_gen.api.river.layer.Layer;
 import io.github.stuff_stuffs.river_net_gen.api.river.layer.PlateType;
 import io.github.stuff_stuffs.river_net_gen.api.river.layer.RiverData;
@@ -8,11 +5,12 @@ import io.github.stuff_stuffs.river_net_gen.api.river.layer.RiverLayers;
 import io.github.stuff_stuffs.river_net_gen.api.util.Hex;
 import io.github.stuff_stuffs.river_net_gen.api.util.ImageOut;
 import io.github.stuff_stuffs.river_net_gen.api.util.SHM;
+import io.github.stuff_stuffs.river_net_gen.impl.util.SHMImpl;
 
 public class Test {
     public static void main(final String[] args) {
         final int seed = 777431342;
-        final int layerCount = 5;
+        final int layerCount = 3;
         final Layer.Basic<PlateType> base = RiverLayers.destroyEnclaves(layerCount + 1, RiverLayers.base(seed, layerCount + 1));
         Layer.Basic<RiverData> riverBase = RiverLayers.riverBase(seed, layerCount, base);
         for (int i = 0; i < 2; i++) {
@@ -23,11 +21,10 @@ public class Test {
         }
         Layer<RiverData> layer = riverBase;
         for (int i = layerCount - 1; i >= 0; i--) {
-            layer = RiverLayers.zoom(i, seed, new Layer.CachingOuter<>(RiverLayers.coastlineGrow(i+1, seed, layer), 8, i+1));
+            layer = RiverLayers.zoom(i, seed, layer);
         }
-        layer = RiverLayers.coastlineGrow(0, seed, layer);
-        final double scale = 1 / 4.0;
-        draw(scale, "triver", layer, true, true, true, true);
+        final double scale = 1 / 8.0;
+        draw(scale, "triver", layer, true, false, true, false);
     }
 
     private static void draw(final double scale, final String prefix, final Layer<RiverData> layer, final boolean terrain, final boolean heightMap, final boolean tiles, final boolean humidity) {
@@ -145,7 +142,7 @@ public class Test {
                     painters[humidityId].accept(i | (i << 8) | (i << 16));
                 }
             }
-        }, 4096, 4096, files);
+        }, 2048, 2048, files);
     }
 
     private static double flowRemap(final double x) {

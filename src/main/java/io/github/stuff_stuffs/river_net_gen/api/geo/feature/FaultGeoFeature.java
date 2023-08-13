@@ -1,6 +1,6 @@
 package io.github.stuff_stuffs.river_net_gen.api.geo.feature;
 
-public class FaultGeoFeature implements GeoFeature {
+public class FaultGeoFeature<T> implements GeoFeature<T> {
     private final double age;
     private final double x, y, z;
     private final double nx, ny, nz;
@@ -41,16 +41,24 @@ public class FaultGeoFeature implements GeoFeature {
             final double dz = context.z() - this.z;
             final double distanceSq = dx * dx + dy * dy + dz * dz;
             final double factor = 1 - distanceSq * invRadiusSq;
+            final int ix;
+            final int iy;
+            final int iz;
             if (factor > 0) {
                 final double side = Math.copySign(1.0, dx * this.nx + dy * this.ny + dz * this.nz);
-                final double rx = this.x + dx + side * factor * this.faultFactor * 0.5 * this.tx;
-                final double ry = this.y + dy + side * factor * this.faultFactor * 0.5 * this.ty;
-                final double rz = this.z + dz + side * factor * this.faultFactor * 0.5 * this.tz;
-                context.x(rx);
-                context.y(ry);
-                context.z(rz);
+                final double power = side * factor * this.faultFactor * 0.5;
+                final double rx = this.x + dx + power * this.tx;
+                final double ry = this.y + dy + power * this.ty;
+                final double rz = this.z + dz + power * this.tz;
+                ix = (int) Math.floor(rx);
+                iy = (int) Math.floor(ry);
+                iz = (int) Math.floor(rz);
+            } else {
+                ix = context.x();
+                iy = context.y();
+                iz = context.z();
             }
-            context.setQuery();
+            return context.query(ix, iy, iz);
         };
     }
 
@@ -60,7 +68,7 @@ public class FaultGeoFeature implements GeoFeature {
     }
 
     @Override
-    public Instance setup(final Registry registry) {
+    public Instance setup(final Registry<T> registry) {
         return instance;
     }
 }

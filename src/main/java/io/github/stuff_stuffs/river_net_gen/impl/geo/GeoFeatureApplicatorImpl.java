@@ -8,19 +8,19 @@ import it.unimi.dsi.fastutil.objects.ObjectIterators;
 
 import java.util.*;
 
-public class GeoFeatureApplicatorImpl implements GeoFeatureApplicator {
-    private static final Comparator<GeoFeature> OLDEST_FIRST = Comparator.comparingDouble(GeoFeature::timeStamp);
-    private final BaseGeoFeature base;
+public class GeoFeatureApplicatorImpl<T> implements GeoFeatureApplicator<T> {
+    private static final Comparator<GeoFeature<?>> OLDEST_FIRST = Comparator.comparingDouble(GeoFeature::timeStamp);
+    private final BaseGeoFeature<T> base;
     private final int maxDepth;
     private final GeoFeatureContextImpl root;
     private final GeoFeatureContextImpl[] contexts;
-    private final GeoFeature[] featureStack;
+    private final GeoFeature<T>[] featureStack;
     private final GeoFeature.Instance[] instances;
     private int features = 0;
     private GeoFeature.Instance baseInstance;
-    private RegistryImpl registry;
+    private RegistryImpl<T> registry;
 
-    public GeoFeatureApplicatorImpl(final BaseGeoFeature base, final int maxDepth) {
+    public GeoFeatureApplicatorImpl(final BaseGeoFeature<T> base, final int maxDepth) {
         this.base = base;
         this.maxDepth = maxDepth;
         root = new GeoFeatureContextImpl(this, maxDepth);
@@ -30,45 +30,50 @@ public class GeoFeatureApplicatorImpl implements GeoFeatureApplicator {
         }
         featureStack = new GeoFeature[maxDepth];
         instances = new GeoFeature.Instance[maxDepth];
-        registry = new RegistryImpl();
-        baseInstance = base.setup(registry);
+        registry = new RegistryImpl<>();
+        baseInstance = base.setup(this, registry);
     }
 
     @Override
-    public int apply(final double x, final double y, final double z) {
+    public int apply(final int x, final int y, final int z) {
         return query(-1, x, y, z);
     }
 
     @Override
-    public void setFeatures(final Collection<? extends GeoFeature> features) {
+    public void setFeatures(final Collection<? extends GeoFeature<T>> features) {
         final int unwrap = ObjectIterators.unwrap(features.iterator(), featureStack);
         this.features = unwrap;
         Arrays.sort(featureStack, 0, unwrap, OLDEST_FIRST);
         if (unwrap != features.size()) {
             throw new RuntimeException();
         }
-        registry = new RegistryImpl();
-        baseInstance = base.setup(registry);
+        registry = new RegistryImpl<>();
+        baseInstance = base.setup(this, registry);
         for (int i = 0; i < unwrap; i++) {
             instances[i] = featureStack[i].setup(registry);
         }
     }
 
     @Override
-    public Set<String> geoIdentifiers() {
+    public Set<T> geoIdentifiers() {
         return Collections.unmodifiableSet(registry.geoIds.keySet());
     }
 
     @Override
-    public OptionalInt getGeoId(final String identifier) {
-        final int i = registry.geoIds.getInt(identifier);
+    public OptionalInt getGeoId(final T feature) {
+        final int i = registry.geoIds.getInt(feature);
         if (i == -1) {
             return OptionalInt.empty();
         }
         return OptionalInt.of(i);
     }
 
-    private int query(final int index, final double x, final double y, final double z) {
+    @Override
+    public T get(final int geoId) {
+        return (T) registry.featuresById[geoId];
+    }
+
+    private int query(final int index, final int x, final int y, final int z) {
         if (index < maxDepth) {
             final GeoFeatureContextImpl context;
             final GeoFeature.Instance feature;
@@ -79,118 +84,69 @@ public class GeoFeatureApplicatorImpl implements GeoFeatureApplicator {
                 context = root;
                 feature = baseInstance;
             }
-            context.x(x);
-            context.y(y);
-            context.z(z);
-            if (!(context.computed | context.fallThrough)) {
-                feature.apply(context);
-            }
-            return context.result();
+            context.x = x;
+            context.y = y;
+            context.z = z;
+            return feature.apply(context);
         } else {
             throw new IllegalStateException();
         }
     }
 
-    private static final class GeoFeatureContextImpl implements GeoFeature.GeoFeatureContext {
-        private final GeoFeatureApplicatorImpl parent;
+    private static final class GeoFeatureContextImpl implements GeoFeature.Context {
+        private final GeoFeatureApplicatorImpl<?> parent;
         private final int index;
-        private double x;
-        private double y;
-        private double z;
-        private boolean fallThrough = false;
-        private int result = 0;
-        private boolean computed = false;
+        private int x;
+        private int y;
+        private int z;
 
-        private GeoFeatureContextImpl(final GeoFeatureApplicatorImpl parent, final int index) {
+        private GeoFeatureContextImpl(final GeoFeatureApplicatorImpl<?> parent, final int index) {
             this.parent = parent;
             this.index = index;
         }
 
         @Override
-        public double x() {
+        public int x() {
             return x;
         }
 
         @Override
-        public double y() {
+        public int y() {
             return y;
         }
 
         @Override
-        public double z() {
+        public int z() {
             return z;
         }
 
         @Override
-        public void x(final double x) {
-            if (x != this.x) {
-                computed = false;
-                fallThrough = false;
-                this.x = x;
-            }
-        }
-
-        @Override
-        public void y(final double y) {
-            if (y != this.y) {
-                computed = false;
-                fallThrough = false;
-                this.y = y;
-            }
-        }
-
-        @Override
-        public void z(final double z) {
-            if (z != this.z) {
-                computed = false;
-                fallThrough = false;
-                this.z = z;
-            }
-        }
-
-        @Override
-        public int query(final double x, final double y, final double z) {
+        public int query(final int x, final int y, final int z) {
             return parent.query(index, x, y, z);
-        }
-
-        @Override
-        public void setQuery() {
-            fallThrough = true;
-        }
-
-        @Override
-        public void set(final int geoId) {
-            computed = true;
-            fallThrough = false;
-            result = geoId;
-        }
-
-        private int result() {
-            if (computed) {
-                return result;
-            } else if (fallThrough) {
-                return query(x, y, z);
-            }
-            throw new IllegalStateException();
         }
     }
 
-    private static final class RegistryImpl implements GeoFeature.Registry {
-        private final Object2IntMap<String> geoIds;
+    private static final class RegistryImpl<T> implements GeoFeature.Registry<T> {
+        private final Object2IntMap<T> geoIds;
+        private Object[] featuresById;
         private int nextId = 0;
 
         public RegistryImpl() {
             geoIds = new Object2IntOpenHashMap<>();
             geoIds.defaultReturnValue(-1);
+            featuresById = new Object[0];
         }
 
         @Override
-        public int getGeoId(final String featureName) {
-            if (geoIds.containsKey(featureName)) {
-                return geoIds.getInt(featureName);
+        public int getGeoId(final T feature) {
+            if (geoIds.containsKey(feature)) {
+                return geoIds.getInt(feature);
             }
             final int id = nextId++;
-            geoIds.put(featureName, id);
+            final Object[] arr = Arrays.copyOf(featuresById, featuresById.length + 1);
+            arr[featuresById.length] = feature;
+            featuresById = arr;
+            geoIds.put(feature, id);
             return id;
         }
     }

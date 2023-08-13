@@ -1,11 +1,11 @@
 package io.github.stuff_stuffs.river_net_gen.api.geo.column;
 
 public class GeoColumn {
-    private final String[] data;
+    private final int[] data;
     private final int[] thicknesses;
     private final int[] heights;
 
-    public GeoColumn(final String[] data, final int[] thicknesses) {
+    public GeoColumn(final int[] data, final int[] thicknesses) {
         this.data = data;
         this.thicknesses = thicknesses;
         heights = new int[thicknesses.length];
@@ -23,7 +23,7 @@ public class GeoColumn {
         return data.length;
     }
 
-    public String data(final int index) {
+    public int data(final int index) {
         return data[index];
     }
 

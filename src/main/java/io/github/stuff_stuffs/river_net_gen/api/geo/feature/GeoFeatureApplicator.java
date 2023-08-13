@@ -6,20 +6,22 @@ import java.util.Collection;
 import java.util.OptionalInt;
 import java.util.Set;
 
-public interface GeoFeatureApplicator {
-    int apply(double x, double y, double z);
+public interface GeoFeatureApplicator<T> {
+    int apply(int x, int y, int z);
 
-    void setFeatures(Collection<? extends GeoFeature> features);
+    void setFeatures(Collection<? extends GeoFeature<T>> features);
 
-    Set<String> geoIdentifiers();
+    Set<T> geoIdentifiers();
 
-    OptionalInt getGeoId(String identifier);
+    OptionalInt getGeoId(T identifier);
 
-    interface BaseGeoFeature {
-        GeoFeature.Instance setup(GeoFeature.Registry registry);
+    T get(int geoId);
+
+    interface BaseGeoFeature<T> {
+        GeoFeature.Instance setup(GeoFeatureApplicator<T> applicator, GeoFeature.Registry<T> registry);
     }
 
-    static GeoFeatureApplicator create(final BaseGeoFeature base, final int maxDepth) {
-        return new GeoFeatureApplicatorImpl(base, maxDepth);
+    static <T> GeoFeatureApplicator<T> create(final BaseGeoFeature<T> base, final int maxDepth) {
+        return new GeoFeatureApplicatorImpl<>(base, maxDepth);
     }
 }

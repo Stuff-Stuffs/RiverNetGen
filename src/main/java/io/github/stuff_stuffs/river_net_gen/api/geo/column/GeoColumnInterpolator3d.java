@@ -18,29 +18,21 @@ public class GeoColumnInterpolator3d {
         tResult = build(x2, z2, third, random);
     }
 
-    public String interpolate(final double x, final double y, final double z) {
+    public int interpolate(final double x, final double y, final double z) {
         final double[] bestScore = new double[]{Double.NEGATIVE_INFINITY};
-        int best = search(x, fResult.yScale * y, z, fResult.sections, bestScore);
-        int chosen = 0;
-        int r = search(x, sResult.yScale * y, z, sResult.sections, bestScore);
-        if (r != -1) {
-            best = r;
-            chosen = 1;
+        final int fBest = search(x, fResult.yScale * y, z, fResult.sections, fResult.data, bestScore);
+        final int sBest = search(x, sResult.yScale * y, z, sResult.sections, sResult.data, bestScore);
+        final int tBest = search(x, tResult.yScale * y, z, tResult.sections, tResult.data, bestScore);
+        if (tBest != -1) {
+            return tBest;
         }
-        r = search(x, tResult.yScale * y, z, tResult.sections, bestScore);
-        if (r != -1) {
-            best = r;
-            chosen = 2;
+        if (sBest != -1) {
+            return sBest;
         }
-        return switch (chosen) {
-            case 0 -> fResult.data[best];
-            case 1 -> sResult.data[best];
-            case 2 -> tResult.data[best];
-            default -> throw new IndexOutOfBoundsException();
-        };
+        return fBest;
     }
 
-    private static int search(final double x, final double y, final double z, final Section[] sections, final double[] bestScoreArr) {
+    private static int search(final double x, final double y, final double z, final Section[] sections, final int[] data, final double[] bestScoreArr) {
         double bestScore = bestScoreArr[0];
         int best = -1;
         for (int i = 0; i < sections.length; i++) {
@@ -56,7 +48,10 @@ public class GeoColumnInterpolator3d {
             }
         }
         bestScoreArr[0] = bestScore;
-        return best;
+        if (best != -1) {
+            return data[best];
+        }
+        return -1;
     }
 
     private static long tripleSeed(final GeoColumn first, final GeoColumn second, final GeoColumn third) {
@@ -67,7 +62,8 @@ public class GeoColumnInterpolator3d {
         long seed = 0;
         final int length = column.length();
         for (int i = 0; i < length; i++) {
-            seed = HashCommon.murmurHash3(seed + 1) ^ column.data(i).hashCode();
+            final int data = column.data(i);
+            seed = HashCommon.murmurHash3(seed + 1) ^ HashCommon.murmurHash3(data ^ HashCommon.murmurHash3(data) + 1);
         }
         return seed;
     }
@@ -75,7 +71,7 @@ public class GeoColumnInterpolator3d {
     private static Result build(final double x, final double z, final GeoColumn column, final ProceduralRandom random) {
         final int length = column.length();
         final Section[] sections = new Section[length];
-        final String[] data = new String[length];
+        final int[] data = new int[length];
         final double yScale = 1 / (double) (column.height(length - 1) + column.thickness(length - 1));
         for (int i = 0; i < length; i++) {
             final double nx = (random.nextDouble() - 0.5) * 0.1;
@@ -88,7 +84,7 @@ public class GeoColumnInterpolator3d {
         return new Result(yScale, sections, data);
     }
 
-    private record Result(double yScale, Section[] sections, String[] data) {
+    private record Result(double yScale, Section[] sections, int[] data) {
     }
 
     private record Section(double x, double y, double z, double nx, double ny, double nz) {

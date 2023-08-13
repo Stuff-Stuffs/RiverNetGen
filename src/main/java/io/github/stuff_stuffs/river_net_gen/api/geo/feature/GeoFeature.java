@@ -1,35 +1,25 @@
 package io.github.stuff_stuffs.river_net_gen.api.geo.feature;
 
-public interface GeoFeature {
+public interface GeoFeature<T> {
     double timeStamp();
 
-    Instance setup(Registry registry);
+    Instance setup(Registry<T> registry);
 
     interface Instance {
-        void apply(GeoFeatureContext context);
+        int apply(Context context);
     }
 
-    interface GeoFeatureContext {
-        double x();
+    interface Context {
+        int x();
 
-        double y();
+        int y();
 
-        double z();
+        int z();
 
-        void x(double x);
-
-        void y(double y);
-
-        void z(double z);
-
-        int query(double x, double y, double z);
-
-        void setQuery();
-
-        void set(int geoId);
+        int query(int x, int y, int z);
     }
 
-    interface Registry {
-        int getGeoId(String featureName);
+    interface Registry<T> {
+        int getGeoId(T feature);
     }
 }

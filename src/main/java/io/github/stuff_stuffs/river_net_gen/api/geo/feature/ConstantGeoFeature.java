@@ -1,10 +1,10 @@
 package io.github.stuff_stuffs.river_net_gen.api.geo.feature;
 
-public class ConstantGeoFeature implements GeoFeature {
+public class ConstantGeoFeature<T> implements GeoFeature<T> {
     private final double age;
-    private final String material;
+    private final T material;
 
-    public ConstantGeoFeature(double age, String material) {
+    public ConstantGeoFeature(final double age, final T material) {
         this.age = age;
         this.material = material;
     }
@@ -15,8 +15,8 @@ public class ConstantGeoFeature implements GeoFeature {
     }
 
     @Override
-    public Instance setup(Registry registry) {
-        int materialGeoId = registry.getGeoId(material);
-        return context -> context.set(materialGeoId);
+    public Instance setup(final Registry<T> registry) {
+        final int materialGeoId = registry.getGeoId(material);
+        return context -> materialGeoId;
     }
 }
